@@ -1,0 +1,2387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>팀 협업 통합 대시보드 | TeamHub</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-800">
+  <div id="app" class="min-h-screen flex flex-col lg:flex-row">
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-slate-900/40 z-30 hidden lg:hidden" onclick="toggleMobileSidebar(false)"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 flex flex-col transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-200 ease-in-out shrink-0">
+      <div class="h-16 px-5 flex items-center justify-between border-b border-slate-200">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h1 class="text-sm font-bold text-slate-900 leading-tight">TeamHub</h1>
+            <p class="text-[11px] text-slate-500">팀 협업 통합 대시보드</p>
+          </div>
+        </div>
+        <button type="button" class="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" onclick="toggleMobileSidebar(false)" aria-label="사이드바 닫기">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin" id="sidebar-nav">
+        <!-- Nav items rendered by JS -->
+      </nav>
+
+      <div class="p-4 border-t border-slate-200 space-y-2.5 bg-slate-50/70">
+        <div class="flex items-center justify-between text-xs text-slate-500">
+          <span>저장 상태</span>
+          <div class="flex items-center gap-1.5">
+            <span id="save-status-badge" class="inline-flex items-center gap-1 text-emerald-600 font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 자동 저장됨
+            </span>
+            <button type="button" onclick="syncFromApi(false)" title="서버에서 최신 데이터 불러오기" class="p-1 rounded hover:bg-slate-200 text-slate-500">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+            </button>
+          </div>
+        </div>
+        <button type="button" onclick="openShareModal()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-sm">
+          <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+          팀원에게 공유 / 내보내기
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <!-- Top Header -->
+      <header class="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-20">
+        <div class="flex items-center gap-3 min-w-0">
+          <button type="button" class="lg:hidden p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100" onclick="toggleMobileSidebar(true)" aria-label="메뉴 열기">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+          <div class="min-w-0">
+            <h2 id="page-title" class="text-base sm:text-lg font-bold text-slate-900 truncate">대시보드 개요</h2>
+          </div>
+          <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium shrink-0">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
+            2026.11.25 (수)
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div class="relative hidden md:block">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input id="global-search" type="text" placeholder="전체 검색 (프로젝트, 문서, 인원...)" class="pl-9 pr-3 py-1.5 w-60 lg:w-72 text-sm bg-slate-100 border border-transparent focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 rounded-lg outline-none transition" oninput="handleGlobalSearch(this.value)" />
+          </div>
+          <button type="button" onclick="openQuickAddModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium transition shadow-sm">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">빠른 등록</span>
+          </button>
+          <button type="button" onclick="openShareModal()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium transition" title="공유 및 데이터 관리">
+            <i data-lucide="share-2" class="w-4 h-4 text-indigo-600"></i>
+            <span class="hidden sm:inline">공유</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Global Search Results Banner (when active) -->
+      <div id="global-search-panel" class="hidden bg-indigo-50/80 border-b border-indigo-200 px-4 sm:px-6 py-3">
+        <div class="max-w-7xl mx-auto">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-indigo-800" id="global-search-summary">검색 결과</span>
+            <button type="button" onclick="clearGlobalSearch()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">검색 닫기</button>
+          </div>
+          <div id="global-search-results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Dynamic View Container -->
+      <main id="main-content" class="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto space-y-6">
+        <!-- Rendered by JS -->
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Container -->
+  <div id="modal-root" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[1px]">
+    <div id="modal-box" class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+        <h3 id="modal-title" class="text-base font-bold text-slate-900">제목</h3>
+        <button type="button" onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" aria-label="모달 닫기">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div id="modal-body" class="p-5 overflow-y-auto scrollbar-thin flex-1"></div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // =========================================================================
+    // 1. INITIAL DATA & STATE MANAGEMENT
+    // =========================================================================
+    const STORAGE_KEY = 'teamhub_dashboard_state_v1';
+    const API_ENDPOINT_KEY = 'teamhub_api_endpoint_v1';
+
+    function getApiEndpoint() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlApi = params.get('api');
+        if (urlApi && urlApi.startsWith('https://')) {
+          localStorage.setItem(API_ENDPOINT_KEY, urlApi.trim());
+          return urlApi.trim();
+        }
+        return localStorage.getItem(API_ENDPOINT_KEY) || '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function setSaveBadge(text, colorClass) {
+      const badge = document.getElementById('save-status-badge');
+      if (badge) {
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + colorClass + '"></span> ' + text;
+      }
+    }
+    const TODAY = '2026-11-25';
+
+    const DEFAULT_STATE = {
+      teamName: '프로덕트 개발팀',
+      activeTab: 'overview',
+      projectViewMode: 'kanban',
+      projectFilterStatus: '전체',
+      projectFilterPriority: '전체',
+      weeklyFilterWeek: '2026-11-W4',
+      weeklyFilterMember: '전체',
+      dailyFilterDate: '2026-11-25',
+      dailyFilterMember: '전체',
+      calendarYear: 2026,
+      calendarMonth: 10, // 0-indexed: 10 = November
+      selectedDate: '2026-11-25',
+      memberFilterStatus: '전체',
+      poolFilterCategory: '전체',
+      poolSearch: '',
+
+      members: [
+        {
+          id: 'm1',
+          name: 'PM / 팀 리드',
+          initials: 'PM',
+          role: '프로덕트 매니저',
+          part: '기획 · 총괄',
+          status: '업무중',
+          workload: 85,
+          contact: '@pm-lead',
+          color: 'bg-indigo-600'
+        },
+        {
+          id: 'm2',
+          name: '프론트엔드 담당',
+          initials: 'FE',
+          role: '프론트엔드 엔지니어',
+          part: '웹 UI · 성능 최적화',
+          status: '업무중',
+          workload: 90,
+          contact: '@fe-dev',
+          color: 'bg-sky-600'
+        },
+        {
+          id: 'm3',
+          name: '백엔드 담당',
+          initials: 'BE',
+          role: '백엔드 엔지니어',
+          part: 'API · DB · 인프라',
+          status: '회의중',
+          workload: 80,
+          contact: '@be-dev',
+          color: 'bg-emerald-600'
+        },
+        {
+          id: 'm4',
+          name: 'UI/UX 디자이너',
+          initials: 'UX',
+          role: '프로덕트 디자이너',
+          part: '디자인 시스템 · UX',
+          status: '재택',
+          workload: 70,
+          contact: '@ux-design',
+          color: 'bg-violet-600'
+        },
+        {
+          id: 'm5',
+          name: 'QA / 운영 담당',
+          initials: 'QA',
+          role: 'QA 엔지니어',
+          part: '품질 검증 · 릴리스',
+          status: '업무중',
+          workload: 75,
+          contact: '@qa-ops',
+          color: 'bg-amber-600'
+        }
+      ],
+
+      projects: [
+        {
+          id: 'p1',
+          title: '팀 협업 대시보드 v2 구축',
+          category: '내부 툴',
+          status: '진행중',
+          priority: '높음',
+          progress: 72,
+          assigneeIds: ['m1', 'm2', 'm4'],
+          dueDate: '2026-12-04',
+          description: '프로젝트, 인원, 주간/일간보고, 일정 및 사내 매뉴얼 Pool을 통합 관리하는 웹 대시보드 구축.'
+        },
+        {
+          id: 'p2',
+          title: '인증/권한 API v3 마이그레이션',
+          category: '인프라/보안',
+          status: '검토중',
+          priority: '긴급',
+          progress: 90,
+          assigneeIds: ['m3', 'm5'],
+          dueDate: '2026-11-28',
+          description: 'OAuth 2.1 토큰 갱신 로직 개선 및 세션 만료 트러블슈팅 반영.'
+        },
+        {
+          id: 'p3',
+          title: '디자인 시스템 토큰 통합',
+          category: '디자인',
+          status: '진행중',
+          priority: '보통',
+          progress: 55,
+          assigneeIds: ['m4', 'm2'],
+          dueDate: '2026-12-12',
+          description: '컬러, 타이포그래피, 간격 토큰을 Figma와 코드베이스 간 1:1 동기화.'
+        },
+        {
+          id: 'p4',
+          title: '연말 트래픽 부하 테스트',
+          category: 'QA/성능',
+          status: '기획/대기',
+          priority: '높음',
+          progress: 20,
+          assigneeIds: ['m5', 'm3'],
+          dueDate: '2026-12-15',
+          description: '동시 접속자 5배 증가 시나리오 기준 DB 커넥션 풀 및 캐시 적중률 점검.'
+        },
+        {
+          id: 'p5',
+          title: '신규 입사자 온보딩 가이드 개편',
+          category: '문서화',
+          status: '완료',
+          priority: '낮음',
+          progress: 100,
+          assigneeIds: ['m1', 'm5'],
+          dueDate: '2026-11-20',
+          description: '개발 환경 세팅, Git 브랜치 전략, 배포 체크리스트 최신화 완료.'
+        }
+      ],
+
+      weeklyReports: [
+        {
+          id: 'w1',
+          week: '2026-11-W4',
+          weekLabel: '2026년 11월 4주차 (11/23~11/27)',
+          authorId: 'm1',
+          projectId: 'p1',
+          completed: '• 대시보드 요구사항 6대 모듈 확정 및 와이어프레임 리뷰 완료\n• 연말 스프린트 우선순위 재조정 및 리소스 배분',
+          nextPlan: '• 대시보드 파일럿 오픈 및 팀원 피드백 수집\n• 12월 로드맵 확정 회의 주관',
+          blockers: '• 외부 공유 시 데이터 동기화 방식(JSON 내보내기/링크 공유) 팀 내 합의 필요',
+          createdAt: '2026-11-25'
+        },
+        {
+          id: 'w2',
+          week: '2026-11-W4',
+          weekLabel: '2026년 11월 4주차 (11/23~11/27)',
+          authorId: 'm3',
+          projectId: 'p2',
+          completed: '• OAuth 토큰 리프레시 레이스 컨디션 패치 적용\n• 스테이징 환경 통합 테스트 98% 통과',
+          nextPlan: '• 프로덕션 카나리 배포(11/27 예정) 및 모니터링\n• 부하 테스트 시나리오 스크립트 작성',
+          blockers: '• 레거시 클라이언트 1종에서 구버전 헤더를 전송하는 케이스 확인 중',
+          createdAt: '2026-11-25'
+        },
+        {
+          id: 'w3',
+          week: '2026-11-W3',
+          weekLabel: '2026년 11월 3주차 (11/16~11/20)',
+          authorId: 'm5',
+          projectId: 'p5',
+          completed: '• 신규 입사자 온보딩 매뉴얼 및 로컬 환경 트러블슈팅 문서 3건 작성\n• 회귀 테스트 자동화 케이스 12개 추가',
+          nextPlan: '• 인증 API v3 스테이징 QA 집중 진행',
+          blockers: '특이사항 없음',
+          createdAt: '2026-11-20'
+        }
+      ],
+
+      dailyReports: [
+        {
+          id: 'd1',
+          date: '2026-11-25',
+          authorId: 'm2',
+          condition: '순조로움',
+          yesterday: '• 칸반 보드 드래그/상태 변경 UI 프로토타입 구현\n• 반응형 사이드바 모바일 대응',
+          today: '• 주간/일간보고 마크다운 복사 기능 및 일정 캘린더 연동\n• 업무 Pool 검색 필터 구현',
+          blockers: '없음'
+        },
+        {
+          id: 'd2',
+          date: '2026-11-25',
+          authorId: 'm3',
+          condition: '집중 필요',
+          yesterday: '• Redis 세션 만료 이슈 원인 분석 및 매뉴얼 초안 작성\n• 인증 API 스테이징 로그 점검',
+          today: '• 레거시 헤더 호환성 미들웨어 패치\n• 15:00 QA 팀과 배포 전 최종 점검 회의',
+          blockers: '• 구버전 앱 테스트 기기 1대 확보 필요'
+        },
+        {
+          id: 'd3',
+          date: '2026-11-25',
+          authorId: 'm4',
+          condition: '순조로움',
+          yesterday: '• 대시보드 상태 배지 컬러 대비(WCAG AA) 검수\n• 빈 상태(Empty state) 아이콘 정리',
+          today: '• 디자인 토큰 JSON 스펙 문서화 및 FE 전달\n• 모바일 카드 간격 미세 조정',
+          blockers: '없음'
+        },
+        {
+          id: 'd4',
+          date: '2026-11-24',
+          authorId: 'm1',
+          condition: '순조로움',
+          yesterday: '• 주간 스프린트 킥오프 및 일정 조율',
+          today: '• 대시보드 공유 UX 검토 및 트러블슈팅 문서 분류 기준 정리',
+          blockers: '없음'
+        }
+      ],
+
+      schedules: [
+        {
+          id: 's1',
+          title: '주간 스프린트 중간 점검 회의',
+          date: '2026-11-25',
+          time: '14:00 - 15:00',
+          category: '팀 회의',
+          attendeeIds: ['m1', 'm2', 'm3', 'm4', 'm5'],
+          description: '대시보드 v2 진행률 및 인증 API v3 배포 일정 최종 확인'
+        },
+        {
+          id: 's2',
+          title: '인증 API v3 스테이징 QA 마감',
+          date: '2026-11-26',
+          time: '17:00',
+          category: '마감일',
+          attendeeIds: ['m3', 'm5'],
+          description: '체크리스트 100% 통과 확인 후 배포 승인'
+        },
+        {
+          id: 's3',
+          title: '인증 API v3 프로덕션 카나리 배포',
+          date: '2026-11-27',
+          time: '10:00 - 11:30',
+          category: '배포/릴리스',
+          attendeeIds: ['m3', 'm5', 'm1'],
+          description: '트래픽 10% -> 50% -> 100% 단계별 전환 및 에러율 모니터링'
+        },
+        {
+          id: 's4',
+          title: '11월 월간 회고 및 지식 Pool 정리',
+          date: '2026-11-30',
+          time: '16:00 - 17:30',
+          category: '팀 회의',
+          attendeeIds: ['m1', 'm2', 'm3', 'm4', 'm5'],
+          description: '11월 트러블슈팅 사례 공유 및 12월 목표 설정'
+        },
+        {
+          id: 's5',
+          title: '팀 협업 대시보드 v2 오픈 목표일',
+          date: '2026-12-04',
+          time: '18:00',
+          category: '마감일',
+          attendeeIds: ['m1', 'm2', 'm4'],
+          description: '전사 공유 링크 배포'
+        }
+      ],
+
+      knowledgePool: [
+        {
+          id: 'k1',
+          title: '[트러블슈팅] Redis 세션 만료 시 401 무한 루프 해결 가이드',
+          category: '트러블슈팅',
+          tags: ['인증', 'Redis', '401에러', '긴급대응'],
+          authorId: 'm3',
+          updatedAt: '2026-11-25',
+          pinned: true,
+          content: '## 증상\n클라이언트가 만료된 Refresh Token으로 동시에 여러 API를 호출할 때, 첫 번째 요청이 토큰을 회전(Rotation)시키면서 후속 요청이 401을 반환해 로그아웃 루프가 발생함.\n\n## 원인\n단일 스레드 토큰 회전 시 5초 유예 기간(Grace Period)이 설정되지 않았음.\n\n## 해결 방법\n1. Redis에 `prev_refresh_token` 키를 TTL 10초로 임시 보관\n2. 클라이언트 Axios/Fetch 인터셉터에 Single-flight Promise 락 적용\n3. 재발 시 `auth-gateway` 로그에서 `ERR_TOKEN_REUSE` 코드 확인'
+        },
+        {
+          id: 'k2',
+          title: '[매뉴얼] 프로덕션 배포 전 필수 체크리스트 (v2.4)',
+          category: '매뉴얼',
+          tags: ['배포', 'QA', '체크리스트'],
+          authorId: 'm5',
+          updatedAt: '2026-11-22',
+          pinned: true,
+          content: '## 배포 전 점검 항목\n1. 스테이징 환경 E2E 테스트 전체 통과 여부 확인\n2. DB 마이그레이션 스크립트 롤백 쿼리 준비 여부\n3. 환경변수(Secrets) 누락 여부 확인\n4. 모니터링 대시보드(에러율/응답시간 알람) 오픈\n\n## 배포 후 30분 모니터링\n- HTTP 5xx 비율 < 0.1%\n- P95 응답시간 기존 대비 +15% 이내 유지'
+        },
+        {
+          id: 'k3',
+          title: '[온보딩] 신규 팀원 로컬 개발 환경 세팅 매뉴얼',
+          category: '온보딩',
+          tags: ['온보딩', '로컬환경', 'Git'],
+          authorId: 'm2',
+          updatedAt: '2026-11-20',
+          pinned: false,
+          content: '## 사전 준비\n- Node.js 20 LTS, Docker Desktop, pnpm 설치\n- 사내 GitHub Organization 권한 요청 (PM에게 슬랙 문의)\n\n## 자주 겪는 문제\n- Apple Silicon(M1~M4) 환경에서 Docker 빌드 오류 시 `--platform linux/amd64` 옵션 추가\n- `.env.local` 파일은 팀 보안 저장소에서 다운로드'
+        },
+        {
+          id: 'k4',
+          title: '[트러블슈팅] 대용량 엑셀/CSV 다운로드 시 타임아웃(504) 대응',
+          category: '트러블슈팅',
+          tags: ['성능', '타임아웃', '스트리밍'],
+          authorId: 'm3',
+          updatedAt: '2026-11-18',
+          pinned: false,
+          content: '## 증상\n5만 건 이상 데이터 내보내기 시 Gateway 60초 제한으로 504 오류 발생.\n\n## 조치\n- 동기 응답 대신 비동기 작업 큐(Job) + 스트리밍 응답으로 전환\n- 급한 경우 조회 기간을 월 단위로 분할 요청하도록 안내'
+        },
+        {
+          id: 'k5',
+          title: '[정책] 주간보고 & 일간보고 작성 규칙',
+          category: '회의록/정책',
+          tags: ['보고', '협업규칙', '커뮤니케이션'],
+          authorId: 'm1',
+          updatedAt: '2026-11-15',
+          pinned: false,
+          content: '## 일간보고 (데일리 스크럼)\n- 매일 오전 10:30 전까지 어제 한 일 / 오늘 할 일 / 블로커 작성\n- 블로커가 있을 경우 즉시 담당자 태그\n\n## 주간보고\n- 매주 금요일 16:00 전까지 금주 완료 사항 및 차주 계획 업데이트\n- 완료된 트러블슈팅은 업무 Pool에 문서로 아카이빙'
+        }
+      ]
+    };
+
+    let state = loadInitialState();
+    let chartInstances = {};
+
+    function loadInitialState() {
+      // 1. Check URL hash (#data=...) for shared state
+      try {
+        const hash = window.location.hash || '';
+        if (hash.startsWith('#data=')) {
+          const encoded = hash.slice(6);
+          const jsonStr = decodeURIComponent(escape(atob(encoded)));
+          const parsed = JSON.parse(jsonStr);
+          if (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects)) {
+            setTimeout(() => showToast('공유된 대시보드 데이터를 불러왔습니다.', 'success'), 300);
+            return { ...structuredClone(DEFAULT_STATE), ...parsed };
+          }
+        }
+      } catch (e) {
+        // Ignore invalid hash
+      }
+
+      // 2. Check localStorage
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects)) {
+            return { ...structuredClone(DEFAULT_STATE), ...parsed };
+          }
+        }
+      } catch (e) {
+        // Ignore storage errors in restricted environments
+      }
+
+      return structuredClone(DEFAULT_STATE);
+    }
+
+    function persistState() {
+      const payload = JSON.stringify(state);
+      try {
+        localStorage.setItem(STORAGE_KEY, payload);
+      } catch (e) {}
+
+      const api = getApiEndpoint();
+      if (api) {
+        setSaveBadge('저장 중...', 'bg-amber-500');
+        fetch(api, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: payload
+        })
+          .then(r => r.json())
+          .then(res => {
+            if (res && res.ok) setSaveBadge('Sheets 동기화됨', 'bg-emerald-500');
+            else setSaveBadge('저장 오류', 'bg-rose-500');
+          })
+          .catch(() => setSaveBadge('연결 오류', 'bg-rose-500'));
+      } else {
+        setSaveBadge('로컬 저장됨', 'bg-emerald-500');
+      }
+    }
+
+    function syncFromApi(silent = false) {
+      const api = getApiEndpoint();
+      if (!api) {
+        if (!silent) showToast('공유 설정에서 Apps Script API URL을 먼저 연결해 주세요.', 'info');
+        return;
+      }
+      setSaveBadge('불러오는 중...', 'bg-sky-500');
+      fetch(api)
+        .then(r => r.json())
+        .then(res => {
+          if (res && res.ok && res.data && Array.isArray(res.data.projects)) {
+            state = { ...structuredClone(DEFAULT_STATE), ...res.data };
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+            renderAll();
+            if (!silent) showToast('Google Sheets에서 최신 데이터를 불러왔습니다.', 'success');
+          } else if (res && res.ok && res.data === null) {
+            persistState();
+          }
+          setSaveBadge('Sheets 동기화됨', 'bg-emerald-500');
+        })
+        .catch(() => {
+          setSaveBadge('연결 오류', 'bg-rose-500');
+          if (!silent) showToast('API 서버에서 데이터를 불러오지 못했습니다.', 'error');
+        });
+    }
+
+    function structuredClone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    function uid(prefix) {
+      return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getMember(id) {
+      return state.members.find(m => m.id === id) || { id: '', name: '미배정', initials: '?', color: 'bg-slate-400', role: '' };
+    }
+
+    function getProject(id) {
+      return state.projects.find(p => p.id === id) || null;
+    }
+
+    // =========================================================================
+    // 2. NAVIGATION & SHELL
+    // =========================================================================
+    const NAV_ITEMS = [
+      { id: 'overview', label: '대시보드 개요', icon: 'layout-dashboard' },
+      { id: 'schedule', label: '일정 관리', icon: 'calendar-days' },
+      { id: 'daily', label: '일간보고', icon: 'clipboard-check' },
+      { id: 'weekly', label: '주간보고', icon: 'file-bar-chart-2' },
+      { id: 'projects', label: '프로젝트 관리', icon: 'kanban' },
+      { id: 'members', label: '인원 관리', icon: 'users' },
+      { id: 'pool', label: '업무 Pool (매뉴얼/이슈)', icon: 'book-open' }
+    ];
+
+    function setActiveTab(tabId) {
+      state.activeTab = tabId;
+      persistState();
+      toggleMobileSidebar(false);
+      renderAll();
+    }
+
+    function toggleMobileSidebar(open) {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (open) {
+        sidebar.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+      } else {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+      }
+    }
+
+    function renderSidebar() {
+      const nav = document.getElementById('sidebar-nav');
+      const counts = {
+        projects: state.projects.filter(p => p.status !== '완료').length,
+        members: state.members.length,
+        weekly: state.weeklyReports.filter(w => w.week === state.weeklyFilterWeek).length,
+        daily: state.dailyReports.filter(d => d.date === TODAY).length,
+        schedule: state.schedules.filter(s => s.date >= TODAY).length,
+        pool: state.knowledgePool.length
+      };
+
+      nav.innerHTML = NAV_ITEMS.map(item => {
+        const active = state.activeTab === item.id;
+        const count = counts[item.id];
+        return `
+          <button type="button" onclick="setActiveTab('${item.id}')"
+            class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+              active
+                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }">
+            <span class="flex items-center gap-2.5 truncate">
+              <i data-lucide="${item.icon}" class="w-4 h-4 shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}"></i>
+              <span class="truncate">${item.label}</span>
+            </span>
+            ${count !== undefined ? `<span class="ml-2 px-2 py-0.5 text-[11px] rounded-full ${active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}">${count}</span>` : ''}
+          </button>
+        `;
+      }).join('');
+
+      const activeItem = NAV_ITEMS.find(n => n.id === state.activeTab);
+      document.getElementById('page-title').textContent = activeItem ? activeItem.label : '대시보드';
+    }
+
+    function renderAll() {
+      destroyCharts();
+      renderSidebar();
+      const main = document.getElementById('main-content');
+      switch (state.activeTab) {
+        case 'overview':
+          main.innerHTML = renderOverview();
+          initOverviewCharts();
+          break;
+        case 'projects':
+          main.innerHTML = renderProjects();
+          break;
+        case 'members':
+          main.innerHTML = renderMembers();
+          break;
+        case 'weekly':
+          main.innerHTML = renderWeeklyReports();
+          break;
+        case 'daily':
+          main.innerHTML = renderDailyReports();
+          break;
+        case 'schedule':
+          main.innerHTML = renderSchedule();
+          break;
+        case 'pool':
+          main.innerHTML = renderPool();
+          break;
+      }
+      lucide.createIcons();
+    }
+
+    function destroyCharts() {
+      Object.values(chartInstances).forEach(ch => {
+        if (ch && typeof ch.destroy === 'function') ch.destroy();
+      });
+      chartInstances = {};
+    }
+
+    // =========================================================================
+    // 3. OVERVIEW VIEW
+    // =========================================================================
+    function renderOverview() {
+      const activeProjects = state.projects.filter(p => p.status !== '완료');
+      const avgProgress = state.projects.length
+        ? Math.round(state.projects.reduce((s, p) => s + p.progress, 0) / state.projects.length)
+        : 0;
+      const avgWorkload = state.members.length
+        ? Math.round(state.members.reduce((s, m) => s + m.workload, 0) / state.members.length)
+        : 0;
+      const todayDailyCount = state.dailyReports.filter(d => d.date === TODAY).length;
+      const upcomingSchedules = [...state.schedules]
+        .filter(s => s.date >= TODAY)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 4);
+      const pinnedDocs = [...state.knowledgePool]
+        .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, 4);
+
+      return `
+        <!-- KPI Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-indigo-200 transition cursor-pointer" onclick="setActiveTab('projects')">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-500">진행 중 프로젝트</span>
+              <span class="p-2 rounded-lg bg-indigo-50 text-indigo-600"><i data-lucide="folder-kanban" class="w-4 h-4"></i></span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-slate-900">${activeProjects.length}건</span>
+              <span class="text-xs text-slate-500">/ 전체 ${state.projects.length}건</span>
+            </div>
+            <p class="text-xs text-indigo-600 mt-2 font-medium">평균 진행률 ${avgProgress}%</p>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-sky-200 transition cursor-pointer" onclick="setActiveTab('members')">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-500">팀 인원 / 평균 가동률</span>
+              <span class="p-2 rounded-lg bg-sky-50 text-sky-600"><i data-lucide="users" class="w-4 h-4"></i></span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-slate-900">${state.members.length}명</span>
+              <span class="text-xs text-slate-500">가동률 ${avgWorkload}%</span>
+            </div>
+            <p class="text-xs text-emerald-600 mt-2 font-medium">업무중 ${state.members.filter(m => m.status === '업무중').length}명 · 재택 ${state.members.filter(m => m.status === '재택').length}명 · <span class="text-purple-600">출장중 ${state.members.filter(m => m.status === '출장중').length}명</span></p>
+            ${(() => {
+              const tripMembers = state.members.filter(m => m.status === '출장중');
+              return tripMembers.length ? `<p class="text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md mt-1.5 truncate">출장중: ${tripMembers.map(m => escapeHtml(m.name)).join(', ')}</p>` : '';
+            })()}
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-emerald-200 transition cursor-pointer" onclick="setActiveTab('daily')">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-500">금일 일간보고 (${TODAY.slice(5)})</span>
+              <span class="p-2 rounded-lg bg-emerald-50 text-emerald-600"><i data-lucide="clipboard-check" class="w-4 h-4"></i></span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-slate-900">${todayDailyCount}건</span>
+              <span class="text-xs text-slate-500">/ ${state.members.length}명</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">금주 주간보고 ${state.weeklyReports.filter(w => w.week === '2026-11-W4').length}건 등록됨</p>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-amber-200 transition cursor-pointer" onclick="setActiveTab('pool')">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-500">업무 Pool (지식베이스)</span>
+              <span class="p-2 rounded-lg bg-amber-50 text-amber-600"><i data-lucide="book-open" class="w-4 h-4"></i></span>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-bold text-slate-900">${state.knowledgePool.length}건</span>
+              <span class="text-xs text-slate-500">매뉴얼 · 트러블슈팅</span>
+            </div>
+            <p class="text-xs text-amber-600 mt-2 font-medium">중요 고정 문서 ${state.knowledgePool.filter(k => k.pinned).length}건</p>
+          </div>
+        </section>
+
+        <!-- Charts Row -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">프로젝트별 진행률</h3>
+                <p class="text-xs text-slate-500">전체 프로젝트 달성도 현황</p>
+              </div>
+              <button type="button" onclick="setActiveTab('projects')" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">전체 보기 →</button>
+            </div>
+            <div class="relative h-64">
+              <canvas id="overview-project-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">팀원별 업무 가동률 (%)</h3>
+                <p class="text-xs text-slate-500">리소스 배분 균형 모니터링</p>
+              </div>
+              <button type="button" onclick="setActiveTab('members')" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">인원 관리 →</button>
+            </div>
+            <div class="relative h-64">
+              <canvas id="overview-workload-chart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Bottom Grid: Upcoming Schedule + Knowledge Pool -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="calendar-clock" class="w-4 h-4 text-indigo-600"></i>
+                다가오는 주요 일정
+              </h3>
+              <button type="button" onclick="setActiveTab('schedule')" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">일정 관리 →</button>
+            </div>
+            <div class="space-y-3">
+              ${upcomingSchedules.length ? upcomingSchedules.map(s => `
+                <div class="flex items-start justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                      ${renderScheduleBadge(s.category)}
+                      <span class="text-xs font-semibold text-slate-500">${s.date} · ${escapeHtml(s.time)}</span>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(s.title)}</p>
+                    <p class="text-xs text-slate-500 truncate mt-0.5">${escapeHtml(s.description)}</p>
+                  </div>
+                </div>
+              `).join('') : '<p class="text-sm text-slate-400 py-6 text-center">예정된 일정이 없습니다.</p>'}
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="pin" class="w-4 h-4 text-amber-500"></i>
+                주요 업무 Pool (매뉴얼 / 트러블슈팅)
+              </h3>
+              <button type="button" onclick="setActiveTab('pool')" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">전체 Pool →</button>
+            </div>
+            <div class="space-y-3">
+              ${pinnedDocs.map(doc => `
+                <div onclick="openPoolDetailModal('${doc.id}')" class="p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-200 transition cursor-pointer">
+                  <div class="flex items-center justify-between gap-2 mb-1">
+                    <div class="flex items-center gap-1.5">
+                      ${renderPoolCategoryBadge(doc.category)}
+                      ${doc.pinned ? '<span class="text-[11px] font-semibold text-amber-600">★ 고정</span>' : ''}
+                    </div>
+                    <span class="text-[11px] text-slate-400">${doc.updatedAt}</span>
+                  </div>
+                  <p class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(doc.title)}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function initOverviewCharts() {
+      const pCtx = document.getElementById('overview-project-chart');
+      if (pCtx && typeof Chart !== 'undefined') {
+        chartInstances.projects = new Chart(pCtx, {
+          type: 'bar',
+          data: {
+            labels: state.projects.map(p => p.title.length > 14 ? p.title.slice(0, 14) + '…' : p.title),
+            datasets: [{
+              label: '진행률 (%)',
+              data: state.projects.map(p => p.progress),
+              backgroundColor: state.projects.map(p =>
+                p.status === '완료' ? '#10b981' : p.status === '검토중' ? '#f59e0b' : '#4f46e5'
+              ),
+              borderRadius: 6,
+              barThickness: 22
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { min: 0, max: 100, grid: { color: '#f1f5f9' } },
+              y: { grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      const wCtx = document.getElementById('overview-workload-chart');
+      if (wCtx && typeof Chart !== 'undefined') {
+        chartInstances.workload = new Chart(wCtx, {
+          type: 'bar',
+          data: {
+            labels: state.members.map(m => m.name),
+            datasets: [{
+              label: '가동률 (%)',
+              data: state.members.map(m => m.workload),
+              backgroundColor: state.members.map(m =>
+                m.workload >= 90 ? '#ef4444' : m.workload >= 75 ? '#4f46e5' : '#0ea5e9'
+              ),
+              borderRadius: 6,
+              barThickness: 28
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { min: 0, max: 110, grid: { color: '#f1f5f9' } },
+              x: { grid: { display: false } }
+            }
+          }
+        });
+      }
+    }
+
+    // =========================================================================
+    // 4. PROJECT MANAGEMENT VIEW
+    // =========================================================================
+    const PROJECT_STATUSES = ['기획/대기', '진행중', '검토중', '완료'];
+    const PRIORITIES = ['긴급', '높음', '보통', '낮음'];
+
+    function renderPriorityBadge(priority) {
+      const map = {
+        '긴급': 'bg-rose-100 text-rose-700',
+        '높음': 'bg-amber-100 text-amber-700',
+        '보통': 'bg-sky-100 text-sky-700',
+        '낮음': 'bg-slate-100 text-slate-600'
+      };
+      return `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${map[priority] || 'bg-slate-100 text-slate-600'}">${escapeHtml(priority)}</span>`;
+    }
+
+    function renderStatusBadge(status) {
+      const map = {
+        '기획/대기': 'bg-slate-100 text-slate-700',
+        '진행중': 'bg-indigo-100 text-indigo-700',
+        '검토중': 'bg-amber-100 text-amber-700',
+        '완료': 'bg-emerald-100 text-emerald-700'
+      };
+      return `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${map[status] || 'bg-slate-100 text-slate-700'}">${escapeHtml(status)}</span>`;
+    }
+
+    function setProjectViewMode(mode) {
+      state.projectViewMode = mode;
+      persistState();
+      renderAll();
+    }
+
+    function setProjectFilter(type, val) {
+      if (type === 'status') state.projectFilterStatus = val;
+      if (type === 'priority') state.projectFilterPriority = val;
+      persistState();
+      renderAll();
+    }
+
+    function renderProjects() {
+      const filtered = state.projects.filter(p => {
+        const matchStatus = state.projectFilterStatus === '전체' || p.status === state.projectFilterStatus;
+        const matchPriority = state.projectFilterPriority === '전체' || p.priority === state.projectFilterPriority;
+        return matchStatus && matchPriority;
+      });
+
+      return `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <select onchange="setProjectFilter('status', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
+              <option value="전체" ${state.projectFilterStatus === '전체' ? 'selected' : ''}>상태: 전체</option>
+              ${PROJECT_STATUSES.map(s => `<option value="${s}" ${state.projectFilterStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+            <select onchange="setProjectFilter('priority', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
+              <option value="전체" ${state.projectFilterPriority === '전체' ? 'selected' : ''}>우선순위: 전체</option>
+              ${PRIORITIES.map(pr => `<option value="${pr}" ${state.projectFilterPriority === pr ? 'selected' : ''}>${pr}</option>`).join('')}
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="inline-flex rounded-lg bg-slate-100 p-0.5">
+              <button type="button" onclick="setProjectViewMode('kanban')" class="px-3 py-1 rounded-md text-xs font-semibold transition ${state.projectViewMode === 'kanban' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}">칸반 보드</button>
+              <button type="button" onclick="setProjectViewMode('table')" class="px-3 py-1 rounded-md text-xs font-semibold transition ${state.projectViewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}">테이블</button>
+            </div>
+            <button type="button" onclick="openProjectModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition">
+              <i data-lucide="plus" class="w-4 h-4"></i> 새 프로젝트
+            </button>
+          </div>
+        </div>
+
+        ${state.projectViewMode === 'kanban' ? renderProjectKanban(filtered) : renderProjectTable(filtered)}
+      `;
+    }
+
+    function renderProjectKanban(projects) {
+      return `
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          ${PROJECT_STATUSES.map(status => {
+            const items = projects.filter(p => p.status === status);
+            return `
+              <div class="bg-slate-100/80 rounded-2xl p-3 border border-slate-200/80 flex flex-col min-h-[260px]">
+                <div class="flex items-center justify-between px-1 mb-3">
+                  <div class="flex items-center gap-2">
+                    ${renderStatusBadge(status)}
+                    <span class="text-xs font-bold text-slate-500">${items.length}</span>
+                  </div>
+                </div>
+                <div class="space-y-3 flex-1">
+                  ${items.length ? items.map(p => `
+                    <div onclick="openProjectModal('${p.id}')" class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow transition cursor-pointer space-y-2.5">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-[11px] font-medium text-slate-400">${escapeHtml(p.category)}</span>
+                        ${renderPriorityBadge(p.priority)}
+                      </div>
+                      <h4 class="text-sm font-bold text-slate-900 leading-snug">${escapeHtml(p.title)}</h4>
+                      <p class="text-xs text-slate-500 line-clamp-2">${escapeHtml(p.description)}</p>
+                      <div>
+                        <div class="flex items-center justify-between text-[11px] mb-1">
+                          <span class="text-slate-500">진행률</span>
+                          <span class="font-semibold text-slate-700">${p.progress}%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div class="h-full rounded-full ${p.progress === 100 ? 'bg-emerald-500' : 'bg-indigo-600'}" style="width: ${p.progress}%"></div>
+                        </div>
+                      </div>
+                      <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                        <div class="flex -space-x-1.5">
+                          ${(p.assigneeIds || []).map(id => {
+                            const m = getMember(id);
+                            return `<span title="${escapeHtml(m.name)}" class="w-6 h-6 rounded-full ${m.color} text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">${escapeHtml(m.initials)}</span>`;
+                          }).join('')}
+                        </div>
+                        <span class="text-[11px] text-slate-400 flex items-center gap-1">
+                          <i data-lucide="calendar" class="w-3 h-3"></i> ${p.dueDate}
+                        </span>
+                      </div>
+                    </div>
+                  `).join('') : '<div class="text-xs text-slate-400 text-center py-8 border border-dashed border-slate-300 rounded-xl">해당 프로젝트 없음</div>'}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderProjectTable(projects) {
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+          <table class="w-full text-left border-collapse min-w-[680px]">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500">
+                <th class="py-3 px-4">프로젝트명</th>
+                <th class="py-3 px-4">분류</th>
+                <th class="py-3 px-4">상태</th>
+                <th class="py-3 px-4">우선순위</th>
+                <th class="py-3 px-4">진행률</th>
+                <th class="py-3 px-4">담당</th>
+                <th class="py-3 px-4">마감일</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-sm">
+              ${projects.length ? projects.map(p => `
+                <tr onclick="openProjectModal('${p.id}')" class="hover:bg-slate-50 cursor-pointer transition">
+                  <td class="py-3 px-4 font-semibold text-slate-900">${escapeHtml(p.title)}</td>
+                  <td class="py-3 px-4 text-xs text-slate-500">${escapeHtml(p.category)}</td>
+                  <td class="py-3 px-4">${renderStatusBadge(p.status)}</td>
+                  <td class="py-3 px-4">${renderPriorityBadge(p.priority)}</td>
+                  <td class="py-3 px-4 w-36">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-600 rounded-full" style="width:${p.progress}%"></div>
+                      </div>
+                      <span class="text-xs font-medium text-slate-600">${p.progress}%</span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4">
+                    <div class="flex -space-x-1.5">
+                      ${(p.assigneeIds || []).map(id => {
+                        const m = getMember(id);
+                        return `<span title="${escapeHtml(m.name)}" class="w-6 h-6 rounded-full ${m.color} text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">${escapeHtml(m.initials)}</span>`;
+                      }).join('')}
+                    </div>
+                  </td>
+                  <td class="py-3 px-4 text-xs text-slate-500">${p.dueDate}</td>
+                </tr>
+              `).join('') : '<tr><td colspan="7" class="py-10 text-center text-sm text-slate-400">조건에 맞는 프로젝트가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 5. MEMBERS (인원 관리) VIEW
+    // =========================================================================
+    function renderMemberStatusBadge(status) {
+      const map = {
+        '업무중': 'bg-emerald-100 text-emerald-700',
+        '회의중': 'bg-amber-100 text-amber-700',
+        '재택': 'bg-sky-100 text-sky-700',
+        '출장중': 'bg-purple-100 text-purple-700',
+        '휴가': 'bg-slate-200 text-slate-600'
+      };
+      return `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${map[status] || 'bg-slate-100 text-slate-700'}">${escapeHtml(status)}</span>`;
+    }
+
+    function setMemberStatusFilter(status) {
+      state.memberFilterStatus = status;
+      persistState();
+      renderAll();
+    }
+
+    function renderMembers() {
+      const statuses = ['전체', '업무중', '회의중', '재택', '출장중', '휴가'];
+      const currentFilter = state.memberFilterStatus || '전체';
+      const filteredMembers = currentFilter === '전체'
+        ? state.members
+        : state.members.filter(m => m.status === currentFilter);
+
+      return `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">팀 인원 및 리소스 현황 (${state.members.length}명)</h3>
+              <p class="text-xs text-slate-500">팀원 이름, 역할, 실시간 상태(출장중 포함) 및 가동률을 클릭하여 수정할 수 있습니다.</p>
+            </div>
+            <button type="button" onclick="openMemberModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition shrink-0">
+              <i data-lucide="user-plus" class="w-4 h-4"></i> 팀원 추가
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            ${statuses.map(st => {
+              const cnt = st === '전체' ? state.members.length : state.members.filter(m => m.status === st).length;
+              const active = currentFilter === st;
+              return `
+                <button type="button" onclick="setMemberStatusFilter('${st}')"
+                  class="px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                    active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }">${st} (${cnt})</button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          ${filteredMembers.length ? filteredMembers.map(m => {
+            const assignedProjects = state.projects.filter(p => (p.assigneeIds || []).includes(m.id) && p.status !== '완료');
+            return `
+              <div onclick="openMemberModal('${m.id}')" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-indigo-300 transition cursor-pointer space-y-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-11 h-11 rounded-xl ${m.color} text-white font-bold text-sm flex items-center justify-center shrink-0">
+                      ${escapeHtml(m.initials)}
+                    </div>
+                    <div class="min-w-0">
+                      <h4 class="text-sm font-bold text-slate-900 truncate">${escapeHtml(m.name)}</h4>
+                      <p class="text-xs text-slate-500 truncate">${escapeHtml(m.role)} · ${escapeHtml(m.part)}</p>
+                    </div>
+                  </div>
+                  ${renderMemberStatusBadge(m.status)}
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1.5">
+                    <span class="text-slate-500 font-medium">현재 업무 가동률</span>
+                    <span class="font-bold ${m.workload >= 90 ? 'text-rose-600' : 'text-slate-800'}">${m.workload}%</span>
+                  </div>
+                  <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full ${m.workload >= 90 ? 'bg-rose-500' : m.workload >= 75 ? 'bg-indigo-600' : 'bg-sky-500'}" style="width:${Math.min(m.workload, 100)}%"></div>
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 space-y-1.5">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400">담당 프로젝트</span>
+                    <span class="font-semibold text-slate-700">${assignedProjects.length}건 진행중</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1">
+                    ${assignedProjects.length ? assignedProjects.map(p => `
+                      <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] truncate max-w-[180px]">${escapeHtml(p.title)}</span>
+                    `).join('') : '<span class="text-[11px] text-slate-400">진행 중인 프로젝트 없음</span>'}
+                  </div>
+                  ${m.contact ? `<p class="text-[11px] text-slate-400 pt-1">연락처: ${escapeHtml(m.contact)}</p>` : ''}
+                </div>
+              </div>
+            `;
+          }).join('') : '<div class="col-span-full bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">해당 상태의 인원이 없습니다.</div>'}
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 6. WEEKLY REPORTS (주간보고) VIEW
+    // =========================================================================
+    function setWeeklyFilter(type, val) {
+      if (type === 'week') state.weeklyFilterWeek = val;
+      if (type === 'member') state.weeklyFilterMember = val;
+      persistState();
+      renderAll();
+    }
+
+    function renderWeeklyReports() {
+      const weeks = Array.from(new Set(state.weeklyReports.map(w => w.week))).sort().reverse();
+      if (!weeks.includes('2026-11-W4')) weeks.unshift('2026-11-W4');
+
+      const filtered = state.weeklyReports.filter(w => {
+        const matchWeek = state.weeklyFilterWeek === '전체' || w.week === state.weeklyFilterWeek;
+        const matchMember = state.weeklyFilterMember === '전체' || w.authorId === state.weeklyFilterMember;
+        return matchWeek && matchMember;
+      });
+
+      return `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <select onchange="setWeeklyFilter('week', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
+              <option value="전체" ${state.weeklyFilterWeek === '전체' ? 'selected' : ''}>전체 주차</option>
+              ${weeks.map(wk => {
+                const found = state.weeklyReports.find(r => r.week === wk);
+                return `<option value="${wk}" ${state.weeklyFilterWeek === wk ? 'selected' : ''}>${found ? escapeHtml(found.weekLabel) : wk}</option>`;
+              }).join('')}
+            </select>
+            <select onchange="setWeeklyFilter('member', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
+              <option value="전체" ${state.weeklyFilterMember === '전체' ? 'selected' : ''}>작성자: 전체</option>
+              ${state.members.map(m => `<option value="${m.id}" ${state.weeklyFilterMember === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="copyWeeklyMarkdown()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium transition">
+              <i data-lucide="copy" class="w-4 h-4"></i> 요약 복사
+            </button>
+            <button type="button" onclick="openWeeklyModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition">
+              <i data-lucide="plus" class="w-4 h-4"></i> 주간보고 작성
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          ${filtered.length ? filtered.map(r => {
+            const author = getMember(r.authorId);
+            const proj = getProject(r.projectId);
+            return `
+              <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl ${author.color} text-white text-xs font-bold flex items-center justify-center">${escapeHtml(author.initials)}</span>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-slate-900">${escapeHtml(author.name)}</span>
+                        <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[11px] font-semibold">${escapeHtml(r.weekLabel)}</span>
+                      </div>
+                      ${proj ? `<p class="text-xs text-slate-500 mt-0.5">관련 프로젝트: ${escapeHtml(proj.title)}</p>` : ''}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="openWeeklyModal('${r.id}')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100">수정</button>
+                    <button type="button" onclick="deleteItem('weeklyReports', '${r.id}')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50">삭제</button>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div class="bg-slate-50 rounded-xl p-3.5">
+                    <h4 class="text-xs font-bold text-emerald-700 mb-2">금주 완료 및 진행 사항</h4>
+                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.completed)}</p>
+                  </div>
+                  <div class="bg-slate-50 rounded-xl p-3.5">
+                    <h4 class="text-xs font-bold text-indigo-700 mb-2">차주 계획</h4>
+                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.nextPlan)}</p>
+                  </div>
+                  <div class="bg-slate-50 rounded-xl p-3.5">
+                    <h4 class="text-xs font-bold text-amber-700 mb-2">이슈 및 지원 요청</h4>
+                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.blockers || '특이사항 없음')}</p>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('') : '<div class="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">해당 조건의 주간보고가 없습니다.</div>'}
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 7. DAILY REPORTS (일간보고) VIEW
+    // =========================================================================
+    function setDailyFilter(type, val) {
+      if (type === 'date') state.dailyFilterDate = val;
+      if (type === 'member') state.dailyFilterMember = val;
+      persistState();
+      renderAll();
+    }
+
+    function renderDailyReports() {
+      const filtered = state.dailyReports.filter(d => {
+        const matchDate = !state.dailyFilterDate || d.date === state.dailyFilterDate;
+        const matchMember = state.dailyFilterMember === '전체' || d.authorId === state.dailyFilterMember;
+        return matchDate && matchMember;
+      }).sort((a, b) => b.date.localeCompare(a.date));
+
+      return `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="date" value="${state.dailyFilterDate}" onchange="setDailyFilter('date', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none" />
+            <button type="button" onclick="setDailyFilter('date', '')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 hover:bg-slate-50 ${state.dailyFilterDate === '' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'text-slate-600'}">전체 날짜</button>
+            <select onchange="setDailyFilter('member', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
+              <option value="전체" ${state.dailyFilterMember === '전체' ? 'selected' : ''}>작성자: 전체</option>
+              ${state.members.map(m => `<option value="${m.id}" ${state.dailyFilterMember === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="copyDailyMarkdown()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium transition">
+              <i data-lucide="copy" class="w-4 h-4"></i> 데일리 요약 복사
+            </button>
+            <button type="button" onclick="openDailyModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition">
+              <i data-lucide="plus" class="w-4 h-4"></i> 일간보고 작성
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${filtered.length ? filtered.map(d => {
+            const author = getMember(d.authorId);
+            const condColor = d.condition === '집중 필요' ? 'bg-amber-100 text-amber-700' : d.condition === '지원 필요' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700';
+            return `
+              <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3.5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl ${author.color} text-white text-xs font-bold flex items-center justify-center">${escapeHtml(author.initials)}</span>
+                    <div>
+                      <p class="text-sm font-bold text-slate-900">${escapeHtml(author.name)}</p>
+                      <p class="text-[11px] text-slate-400">${d.date}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${condColor}">${escapeHtml(d.condition)}</span>
+                    <button type="button" onclick="openDailyModal('${d.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="수정"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" onclick="deleteItem('dailyReports', '${d.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="삭제"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                  </div>
+                </div>
+                <div class="space-y-2.5 text-xs">
+                  <div>
+                    <span class="font-bold text-slate-500 block mb-1">어제 한 일 (Done)</span>
+                    <p class="text-slate-700 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.yesterday)}</p>
+                  </div>
+                  <div>
+                    <span class="font-bold text-indigo-600 block mb-1">오늘 할 일 (Today)</span>
+                    <p class="text-slate-800 whitespace-pre-line bg-indigo-50/50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.today)}</p>
+                  </div>
+                  ${d.blockers && d.blockers !== '없음' ? `
+                    <div>
+                      <span class="font-bold text-rose-600 block mb-1">블로커 / 특이사항</span>
+                      <p class="text-rose-700 whitespace-pre-line bg-rose-50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.blockers)}</p>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('') : '<div class="col-span-full bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">해당 날짜/조건의 일간보고가 없습니다.</div>'}
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 8. SCHEDULE MANAGEMENT (일정 관리) VIEW
+    // =========================================================================
+    function renderScheduleBadge(cat) {
+      const map = {
+        '팀 회의': 'bg-indigo-100 text-indigo-700',
+        '마감일': 'bg-rose-100 text-rose-700',
+        '배포/릴리스': 'bg-emerald-100 text-emerald-700',
+        '휴가/부재': 'bg-amber-100 text-amber-700',
+        '기타': 'bg-slate-100 text-slate-700'
+      };
+      return `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${map[cat] || 'bg-slate-100 text-slate-700'}">${escapeHtml(cat)}</span>`;
+    }
+
+    function changeCalendarMonth(delta) {
+      let m = state.calendarMonth + delta;
+      let y = state.calendarYear;
+      if (m < 0) { m = 11; y--; }
+      if (m > 11) { m = 0; y++; }
+      state.calendarMonth = m;
+      state.calendarYear = y;
+      persistState();
+      renderAll();
+    }
+
+    function selectCalendarDate(dateStr) {
+      state.selectedDate = dateStr;
+      persistState();
+      renderAll();
+    }
+
+    function renderSchedule() {
+      const y = state.calendarYear;
+      const m = state.calendarMonth; // 0-indexed
+      const firstDay = new Date(y, m, 1).getDay();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const monthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+
+      const cells = [];
+      for (let i = 0; i < firstDay; i++) cells.push(null);
+      for (let d = 1; d <= daysInMonth; d++) {
+        cells.push(`${monthStr}-${String(d).padStart(2, '0')}`);
+      }
+
+      const dayEvents = state.schedules
+        .filter(s => s.date === state.selectedDate)
+        .sort((a, b) => a.time.localeCompare(b.time));
+
+      const monthEvents = state.schedules
+        .filter(s => s.date.startsWith(monthStr))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      return `
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Calendar Card -->
+          <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-bold text-slate-900">${y}년 ${m + 1}월</h3>
+                <button type="button" onclick="changeCalendarMonth(-1)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" aria-label="이전 달"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                <button type="button" onclick="changeCalendarMonth(1)" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" aria-label="다음 달"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+              </div>
+              <button type="button" onclick="openScheduleModal('', '${state.selectedDate}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition">
+                <i data-lucide="plus" class="w-4 h-4"></i> 일정 추가
+              </button>
+            </div>
+
+            <div class="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 pb-2 border-b border-slate-100">
+              <div class="text-rose-500">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-sky-500">토</div>
+            </div>
+            <div class="grid grid-cols-7 gap-1 pt-2">
+              ${cells.map(dateStr => {
+                if (!dateStr) return '<div class="h-16 sm:h-20"></div>';
+                const dayNum = parseInt(dateStr.slice(-2), 10);
+                const isToday = dateStr === TODAY;
+                const isSelected = dateStr === state.selectedDate;
+                const evts = state.schedules.filter(s => s.date === dateStr);
+                return `
+                  <button type="button" onclick="selectCalendarDate('${dateStr}')"
+                    class="h-16 sm:h-20 p-1.5 rounded-xl border text-left flex flex-col justify-between transition ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500'
+                        : 'border-slate-100 hover:border-slate-300 bg-white'
+                    }">
+                    <span class="text-xs font-bold ${isToday ? 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white' : 'text-slate-700'}">${dayNum}</span>
+                    <div class="space-y-0.5 overflow-hidden">
+                      ${evts.slice(0, 2).map(e => `
+                        <div class="text-[10px] leading-tight px-1 py-0.5 rounded bg-indigo-100/80 text-indigo-800 truncate font-medium">${escapeHtml(e.title)}</div>
+                      `).join('')}
+                      ${evts.length > 2 ? `<div class="text-[10px] text-slate-400 px-1">+${evts.length - 2}</div>` : ''}
+                    </div>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Selected Date & Month Events -->
+          <div class="space-y-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-bold text-slate-900">${state.selectedDate} 일정</h4>
+                <button type="button" onclick="openScheduleModal('', '${state.selectedDate}')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ 추가</button>
+              </div>
+              <div class="space-y-2.5">
+                ${dayEvents.length ? dayEvents.map(s => `
+                  <div onclick="openScheduleModal('${s.id}')" class="p-3 rounded-xl bg-slate-50 hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-200 cursor-pointer transition space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                      ${renderScheduleBadge(s.category)}
+                      <span class="text-[11px] font-medium text-slate-500">${escapeHtml(s.time)}</span>
+                    </div>
+                    <p class="text-sm font-bold text-slate-900">${escapeHtml(s.title)}</p>
+                    <p class="text-xs text-slate-500">${escapeHtml(s.description)}</p>
+                  </div>
+                `).join('') : '<p class="text-xs text-slate-400 py-6 text-center">선택한 날짜에 일정이 없습니다.</p>'}
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+              <h4 class="text-sm font-bold text-slate-900 mb-3">${m + 1}월 전체 일정 (${monthEvents.length}건)</h4>
+              <div class="space-y-2 max-h-60 overflow-y-auto scrollbar-thin">
+                ${monthEvents.length ? monthEvents.map(s => `
+                  <div onclick="selectCalendarDate('${s.date}')" class="flex items-center justify-between gap-2 text-xs p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700 truncate">${escapeHtml(s.title)}</span>
+                    <span class="text-slate-400 shrink-0">${s.date.slice(5)}</span>
+                  </div>
+                `).join('') : '<p class="text-xs text-slate-400">등록된 일정이 없습니다.</p>'}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 9. KNOWLEDGE POOL (업무 관련 내용 Pool) VIEW
+    // =========================================================================
+    const POOL_CATEGORIES = ['전체', '매뉴얼', '트러블슈팅', '온보딩', '회의록/정책', '기타'];
+
+    function renderPoolCategoryBadge(cat) {
+      const map = {
+        '매뉴얼': 'bg-indigo-100 text-indigo-700',
+        '트러블슈팅': 'bg-rose-100 text-rose-700',
+        '온보딩': 'bg-emerald-100 text-emerald-700',
+        '회의록/정책': 'bg-violet-100 text-violet-700',
+        '기타': 'bg-slate-100 text-slate-700'
+      };
+      return `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold ${map[cat] || 'bg-slate-100 text-slate-700'}">${escapeHtml(cat)}</span>`;
+    }
+
+    function setPoolFilter(cat) {
+      state.poolFilterCategory = cat;
+      persistState();
+      renderAll();
+    }
+
+    function setPoolSearch(q) {
+      state.poolSearch = q;
+      renderAll();
+    }
+
+    function togglePoolPin(id, e) {
+      e.stopPropagation();
+      const doc = state.knowledgePool.find(k => k.id === id);
+      if (doc) {
+        doc.pinned = !doc.pinned;
+        persistState();
+        renderAll();
+      }
+    }
+
+    function renderPool() {
+      const q = (state.poolSearch || '').trim().toLowerCase();
+      const filtered = state.knowledgePool.filter(k => {
+        const matchCat = state.poolFilterCategory === '전체' || k.category === state.poolFilterCategory;
+        const matchQ = !q ||
+          k.title.toLowerCase().includes(q) ||
+          k.content.toLowerCase().includes(q) ||
+          (k.tags || []).some(t => t.toLowerCase().includes(q));
+        return matchCat && matchQ;
+      }).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt.localeCompare(a.updatedAt));
+
+      return `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex flex-wrap gap-1.5">
+              ${POOL_CATEGORIES.map(cat => `
+                <button type="button" onclick="setPoolFilter('${cat}')"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    state.poolFilterCategory === cat
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }">${cat}</button>
+              `).join('')}
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="relative flex-1 sm:w-56">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                <input type="text" value="${escapeHtml(state.poolSearch)}" oninput="setPoolSearch(this.value)" placeholder="제목, 태그, 본문 검색..." class="w-full pl-8 pr-3 py-1.5 text-xs sm:text-sm border border-slate-200 rounded-lg bg-slate-50 focus:bg-white outline-none" />
+              </div>
+              <button type="button" onclick="openPoolEditModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold transition shrink-0">
+                <i data-lucide="plus" class="w-4 h-4"></i> 문서 등록
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${filtered.length ? filtered.map(doc => {
+            const author = getMember(doc.authorId);
+            return `
+              <div onclick="openPoolDetailModal('${doc.id}')" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:border-indigo-300 hover:shadow transition cursor-pointer flex flex-col justify-between gap-3">
+                <div class="space-y-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      ${renderPoolCategoryBadge(doc.category)}
+                      <span class="text-[11px] text-slate-400">수정: ${doc.updatedAt}</span>
+                    </div>
+                    <button type="button" onclick="togglePoolPin('${doc.id}', event)" class="p-1 rounded-lg hover:bg-slate-100 ${doc.pinned ? 'text-amber-500' : 'text-slate-300'}" title="상단 고정">
+                      <i data-lucide="pin" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                  <h4 class="text-sm font-bold text-slate-900 leading-snug">${escapeHtml(doc.title)}</h4>
+                  <p class="text-xs text-slate-500 line-clamp-3 leading-relaxed">${escapeHtml(doc.content.replace(/#+ /g, ''))}</p>
+                </div>
+                <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                  <div class="flex flex-wrap gap-1">
+                    ${(doc.tags || []).map(t => `<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px]">#${escapeHtml(t)}</span>`).join('')}
+                  </div>
+                  <span class="text-[11px] text-slate-400 shrink-0">${escapeHtml(author.name)}</span>
+                </div>
+              </div>
+            `;
+          }).join('') : '<div class="col-span-full bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">검색 조건에 맞는 문서가 없습니다.</div>'}
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // 10. MODALS (CRUD + SHARE + QUICK ADD)
+    // =========================================================================
+    function openModal(title, bodyHtml) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-body').innerHTML = bodyHtml;
+      const root = document.getElementById('modal-root');
+      root.classList.remove('hidden');
+      root.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+      const root = document.getElementById('modal-root');
+      root.classList.add('hidden');
+      root.classList.remove('flex');
+    }
+
+    function openQuickAddModal() {
+      openModal('빠른 등록', `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button type="button" onclick="openProjectModal()" class="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-left transition">
+            <p class="text-sm font-bold text-slate-900">새 프로젝트</p>
+            <p class="text-xs text-slate-500 mt-1">칸반 보드 및 진행률 등록</p>
+          </button>
+          <button type="button" onclick="openDailyModal()" class="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-left transition">
+            <p class="text-sm font-bold text-slate-900">일간보고 작성</p>
+            <p class="text-xs text-slate-500 mt-1">오늘 할 일 및 블로커 기록</p>
+          </button>
+          <button type="button" onclick="openWeeklyModal()" class="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-left transition">
+            <p class="text-sm font-bold text-slate-900">주간보고 작성</p>
+            <p class="text-xs text-slate-500 mt-1">금주 성과 및 차주 계획</p>
+          </button>
+          <button type="button" onclick="openScheduleModal()" class="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-left transition">
+            <p class="text-sm font-bold text-slate-900">새 일정 등록</p>
+            <p class="text-xs text-slate-500 mt-1">회의, 마감일, 배포 일정</p>
+          </button>
+          <button type="button" onclick="openPoolEditModal()" class="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 text-left transition sm:col-span-2">
+            <p class="text-sm font-bold text-slate-900">업무 Pool 문서 등록</p>
+            <p class="text-xs text-slate-500 mt-1">매뉴얼, 트러블슈팅, 온보딩 가이드 공유</p>
+          </button>
+        </div>
+      `);
+    }
+
+    // --- Project Modal ---
+    function openProjectModal(id = '') {
+      const item = id ? state.projects.find(p => p.id === id) : null;
+      openModal(item ? '프로젝트 수정' : '새 프로젝트 등록', `
+        <form onsubmit="saveProject(event, '${id}')" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">프로젝트명 *</label>
+            <input required name="title" value="${item ? escapeHtml(item.title) : ''}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">분류</label>
+              <input name="category" value="${item ? escapeHtml(item.category) : '일반'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">마감일</label>
+              <input type="date" name="dueDate" value="${item ? item.dueDate : '2026-12-10'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">상태</label>
+              <select name="status" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${PROJECT_STATUSES.map(s => `<option value="${s}" ${item && item.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">우선순위</label>
+              <select name="priority" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${PRIORITIES.map(pr => `<option value="${pr}" ${item && item.priority === pr ? 'selected' : ''}>${pr}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">진행률 (%)</label>
+              <input type="number" min="0" max="100" name="progress" value="${item ? item.progress : 0}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">담당 팀원</label>
+            <div class="flex flex-wrap gap-2">
+              ${state.members.map(m => {
+                const checked = item && (item.assigneeIds || []).includes(m.id);
+                return `
+                  <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-xs cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" name="assigneeIds" value="${m.id}" ${checked ? 'checked' : ''} class="rounded text-indigo-600" />
+                    <span>${escapeHtml(m.name)}</span>
+                  </label>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">설명</label>
+            <textarea name="description" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400">${item ? escapeHtml(item.description) : ''}</textarea>
+          </div>
+          <div class="flex items-center justify-between pt-2">
+            ${item ? `<button type="button" onclick="deleteItem('projects', '${item.id}', true)" class="px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50">삭제</button>` : '<div></div>'}
+            <div class="flex gap-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
+              <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+            </div>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveProject(e, id) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {
+        id: id || uid('p'),
+        title: fd.get('title').trim(),
+        category: fd.get('category').trim() || '일반',
+        dueDate: fd.get('dueDate') || TODAY,
+        status: fd.get('status'),
+        priority: fd.get('priority'),
+        progress: Math.min(100, Math.max(0, parseInt(fd.get('progress'), 10) || 0)),
+        assigneeIds: fd.getAll('assigneeIds'),
+        description: fd.get('description').trim()
+      };
+      if (data.status === '완료') data.progress = 100;
+      if (id) {
+        const idx = state.projects.findIndex(p => p.id === id);
+        if (idx !== -1) state.projects[idx] = data;
+      } else {
+        state.projects.unshift(data);
+      }
+      persistState();
+      closeModal();
+      renderAll();
+      showToast(id ? '프로젝트가 수정되었습니다.' : '새 프로젝트가 등록되었습니다.', 'success');
+    }
+
+    // --- Member Modal ---
+    function openMemberModal(id = '') {
+      const item = id ? state.members.find(m => m.id === id) : null;
+      const colors = ['bg-indigo-600', 'bg-sky-600', 'bg-emerald-600', 'bg-violet-600', 'bg-amber-600', 'bg-rose-600'];
+      openModal(item ? '팀원 정보 수정' : '새 팀원 추가', `
+        <form onsubmit="saveMember(event, '${id}')" class="space-y-4">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">이름 / 역할명 *</label>
+              <input required name="name" value="${item ? escapeHtml(item.name) : ''}" placeholder="예: 홍길동 또는 프론트엔드 담당" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">이니셜 (2자)</label>
+              <input name="initials" maxlength="3" value="${item ? escapeHtml(item.initials) : 'TM'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">직무</label>
+              <input name="role" value="${item ? escapeHtml(item.role) : ''}" placeholder="예: 백엔드 엔지니어" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">담당 파트</label>
+              <input name="part" value="${item ? escapeHtml(item.part) : ''}" placeholder="예: API · DB" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">현재 상태</label>
+              <select name="status" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${['업무중', '회의중', '재택', '출장중', '휴가'].map(s => `<option value="${s}" ${item && item.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">가동률 (%)</label>
+              <input type="number" min="0" max="120" name="workload" value="${item ? item.workload : 80}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">연락처/핸들</label>
+              <input name="contact" value="${item ? escapeHtml(item.contact) : ''}" placeholder="@handle" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5">프로필 색상</label>
+            <div class="flex gap-2">
+              ${colors.map(c => `
+                <label class="cursor-pointer">
+                  <input type="radio" name="color" value="${c}" ${(item ? item.color === c : c === 'bg-indigo-600') ? 'checked' : ''} class="sr-only peer" />
+                  <span class="block w-7 h-7 rounded-lg ${c} ring-offset-2 peer-checked:ring-2 peer-checked:ring-slate-900"></span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-2">
+            ${item ? `<button type="button" onclick="deleteItem('members', '${item.id}', true)" class="px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50">삭제</button>` : '<div></div>'}
+            <div class="flex gap-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
+              <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+            </div>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveMember(e, id) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const name = fd.get('name').trim();
+      const data = {
+        id: id || uid('m'),
+        name,
+        initials: (fd.get('initials').trim() || name.slice(0, 2)).toUpperCase(),
+        role: fd.get('role').trim() || '팀원',
+        part: fd.get('part').trim() || '-',
+        status: fd.get('status'),
+        workload: Math.min(120, Math.max(0, parseInt(fd.get('workload'), 10) || 0)),
+        contact: fd.get('contact').trim(),
+        color: fd.get('color') || 'bg-indigo-600'
+      };
+      if (id) {
+        const idx = state.members.findIndex(m => m.id === id);
+        if (idx !== -1) state.members[idx] = data;
+      } else {
+        state.members.push(data);
+      }
+      persistState();
+      closeModal();
+      renderAll();
+      showToast(id ? '팀원 정보가 수정되었습니다.' : '새 팀원이 추가되었습니다.', 'success');
+    }
+
+    // --- Weekly Report Modal ---
+    function openWeeklyModal(id = '') {
+      const item = id ? state.weeklyReports.find(w => w.id === id) : null;
+      openModal(item ? '주간보고 수정' : '주간보고 작성', `
+        <form onsubmit="saveWeekly(event, '${id}')" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">작성자</label>
+              <select name="authorId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${state.members.map(m => `<option value="${m.id}" ${item && item.authorId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">관련 프로젝트</label>
+              <select name="projectId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                <option value="">전체/일반</option>
+                ${state.projects.map(p => `<option value="${p.id}" ${item && item.projectId === p.id ? 'selected' : ''}>${escapeHtml(p.title)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">주차 코드</label>
+              <input required name="week" value="${item ? escapeHtml(item.week) : '2026-11-W4'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">주차 표시명</label>
+              <input required name="weekLabel" value="${item ? escapeHtml(item.weekLabel) : '2026년 11월 4주차 (11/23~11/27)'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">금주 완료 및 진행 사항 *</label>
+            <textarea required name="completed" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.completed) : '• '}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">차주 계획 *</label>
+            <textarea required name="nextPlan" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.nextPlan) : '• '}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">이슈 및 지원 요청</label>
+            <textarea name="blockers" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.blockers) : '특이사항 없음'}</textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
+            <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveWeekly(e, id) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {
+        id: id || uid('w'),
+        authorId: fd.get('authorId'),
+        projectId: fd.get('projectId'),
+        week: fd.get('week').trim(),
+        weekLabel: fd.get('weekLabel').trim(),
+        completed: fd.get('completed').trim(),
+        nextPlan: fd.get('nextPlan').trim(),
+        blockers: fd.get('blockers').trim(),
+        createdAt: TODAY
+      };
+      if (id) {
+        const idx = state.weeklyReports.findIndex(w => w.id === id);
+        if (idx !== -1) state.weeklyReports[idx] = data;
+      } else {
+        state.weeklyReports.unshift(data);
+      }
+      persistState();
+      closeModal();
+      renderAll();
+      showToast('주간보고가 저장되었습니다.', 'success');
+    }
+
+    // --- Daily Report Modal ---
+    function openDailyModal(id = '') {
+      const item = id ? state.dailyReports.find(d => d.id === id) : null;
+      openModal(item ? '일간보고 수정' : '일간보고 작성', `
+        <form onsubmit="saveDaily(event, '${id}')" class="space-y-4">
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">작성자</label>
+              <select name="authorId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${state.members.map(m => `<option value="${m.id}" ${item && item.authorId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">날짜</label>
+              <input type="date" required name="date" value="${item ? item.date : TODAY}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">진행 상태</label>
+              <select name="condition" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${['순조로움', '집중 필요', '지원 필요'].map(c => `<option value="${c}" ${item && item.condition === c ? 'selected' : ''}>${c}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">어제 한 일 (Done) *</label>
+            <textarea required name="yesterday" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.yesterday) : '• '}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">오늘 할 일 (Today) *</label>
+            <textarea required name="today" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.today) : '• '}</textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">블로커 / 특이사항</label>
+            <textarea name="blockers" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.blockers) : '없음'}</textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
+            <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveDaily(e, id) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {
+        id: id || uid('d'),
+        authorId: fd.get('authorId'),
+        date: fd.get('date'),
+        condition: fd.get('condition'),
+        yesterday: fd.get('yesterday').trim(),
+        today: fd.get('today').trim(),
+        blockers: fd.get('blockers').trim() || '없음'
+      };
+      if (id) {
+        const idx = state.dailyReports.findIndex(d => d.id === id);
+        if (idx !== -1) state.dailyReports[idx] = data;
+      } else {
+        state.dailyReports.unshift(data);
+      }
+      persistState();
+      closeModal();
+      renderAll();
+      showToast('일간보고가 저장되었습니다.', 'success');
+    }
+
+    // --- Schedule Modal ---
+    function openScheduleModal(id = '', defaultDate = '') {
+      const item = id ? state.schedules.find(s => s.id === id) : null;
+      openModal(item ? '일정 수정' : '새 일정 등록', `
+        <form onsubmit="saveSchedule(event, '${id}')" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">일정 제목 *</label>
+            <input required name="title" value="${item ? escapeHtml(item.title) : ''}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">날짜</label>
+              <input type="date" required name="date" value="${item ? item.date : (defaultDate || state.selectedDate || TODAY)}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">시간</label>
+              <input name="time" value="${item ? escapeHtml(item.time) : '14:00 - 15:00'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">분류</label>
+              <select name="category" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${['팀 회의', '마감일', '배포/릴리스', '휴가/부재', '기타'].map(c => `<option value="${c}" ${item && item.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">설명 / 메모</label>
+            <textarea name="description" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.description) : ''}</textarea>
+          </div>
+          <div class="flex items-center justify-between pt-2">
+            ${item ? `<button type="button" onclick="deleteItem('schedules', '${item.id}', true)" class="px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50">삭제</button>` : '<div></div>'}
+            <div class="flex gap-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
+              <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+            </div>
+          </div>
+        </form>
+      `);
+    }
+
+    function saveSchedule(e, id) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {
+        id: id || uid('s'),
+        title: fd.get('title').trim(),
+        date: fd.get('date'),
+        time: fd.get('time').trim() || '종일',
+        category: fd.get('category'),
+        attendeeIds: [],
+        description: fd.get('description').trim()
+      };
+      if (id) {
+        const idx = state.schedules.findIndex(s => s.id === id);
+        if (idx !== -1) state.schedules[idx] = data;
+      } else {
+        state.schedules.push(data);
+      }
+      state.selectedDate = data.date;
+      persistState();
+      closeModal();
+      renderAll();
+      showToast('일정이 저장되었습니다.', 'success');
+    }
+
+    // --- Knowledge Pool Modals ---
+    function openPoolDetailModal(id) {
+      const doc = state.knowledgePool.find(k => k.id === id);
+      if (!doc) return;
+      const author = getMember(doc.authorId);
+      openModal(doc.title, `
+        <div class="space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              ${renderPoolCategoryBadge(doc.category)}
+              <span class="text-xs text-slate-500">작성자: ${escapeHtml(author.name)}</span>
+              <span class="text-xs text-slate-400">· ${doc.updatedAt}</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="openPoolEditModal('${doc.id}')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700">편집</button>
+              <button type="button" onclick="deleteItem('knowledgePool', '${doc.id}', true)" class="px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50">삭제</button>
+            </div>
+          </div>
+          <div class="bg-slate-50 rounded-xl p-4 text-sm text-slate-800 whitespace-pre-line leading-relaxed font-normal">${escapeHtml(doc.content)}</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${(doc.tags || []).map(t => `<span class="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-xs font-medium">#${escapeHtml(t)}</span>`).join('')}
+          </div>
+        </div>
+      `);
+    }
+
+    function openPoolEditModal(id = '') {
+      const doc = id ? state.knowledgePool.find(k => k.id === id) : null;
+      openModal(doc ? '업무 Pool 문서 수정' : '새 업무 Pool 문서 등록', `
+        <form onsubmit="savePoolDoc(event, '${id}')" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">문서 제목 *</label>
+            <input required name="title" value="${doc ? escapeHtml(doc.title) : ''}" placeholder="예: [트러블슈팅] 배포 후 캐시 무효화 방법" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">카테고리</label>
+              <select name="category" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${POOL_CATEGORIES.filter(c => c !== '전체').map(c => `<option value="${c}" ${doc && doc.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">작성자</label>
+              <select name="authorId" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                ${state.members.map(m => `<option value="${m.id}" ${doc && doc.authorId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">태그 (쉼표로 구분)</label>
+            <input name="tags" value="${doc ? escapeHtml((doc.tags || []).join(', ')) : ''}" placeholder="예: 매뉴얼, 배포, 장애대응" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">본문 내용 *</label>
+            <textarea required name="content" rows="7" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm leading-relaxed">${doc ? escapeHtml(doc.content) : ''}</textarea>
+          </div>
+          <label class="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" name="pinned" ${doc && doc.pinned ? 'checked' : ''} class="rounded text-indigo-600" />
+            <span>상단 중요 문서로 고정</span>
+          </label>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
+            <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">저장</button>
+          </div>
+        </form>
+      `);
+    }
+
+    function savePoolDoc(e, id) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const data = {
+        id: id || uid('k'),
+        title: fd.get('title').trim(),
+        category: fd.get('category'),
+        authorId: fd.get('authorId'),
+        tags: fd.get('tags').split(',').map(t => t.trim()).filter(Boolean),
+        content: fd.get('content').trim(),
+        pinned: fd.get('pinned') === 'on',
+        updatedAt: TODAY
+      };
+      if (id) {
+        const idx = state.knowledgePool.findIndex(k => k.id === id);
+        if (idx !== -1) state.knowledgePool[idx] = data;
+      } else {
+        state.knowledgePool.unshift(data);
+      }
+      persistState();
+      closeModal();
+      renderAll();
+      showToast('업무 Pool 문서가 저장되었습니다.', 'success');
+    }
+
+    function deleteItem(collectionKey, id, fromModal = false) {
+      state[collectionKey] = state[collectionKey].filter(item => item.id !== id);
+      persistState();
+      if (fromModal) closeModal();
+      renderAll();
+      showToast('항목이 삭제되었습니다.', 'info');
+    }
+
+    // =========================================================================
+    // 11. SHARING, EXPORT / IMPORT & COPY UTILITIES
+    // =========================================================================
+    function saveApiEndpointFromModal(e) {
+      e.preventDefault();
+      const val = (new FormData(e.target).get('apiUrl') || '').trim();
+      try {
+        if (val) localStorage.setItem(API_ENDPOINT_KEY, val);
+        else localStorage.removeItem(API_ENDPOINT_KEY);
+      } catch (err) {}
+      closeModal();
+      if (val) {
+        syncFromApi(false);
+      } else {
+        setSaveBadge('로컬 저장됨', 'bg-emerald-500');
+        showToast('API 연결이 해제되었습니다.', 'info');
+      }
+    }
+
+    function copyTeamInviteUrl() {
+      const api = getApiEndpoint();
+      const base = window.location.href.split('#')[0].split('?')[0];
+      const url = api ? `${base}?api=${encodeURIComponent(api)}` : base;
+      copyTextToClipboard(url, '팀원 접속용 링크가 복사되었습니다.');
+    }
+
+    function openShareModal() {
+      const currentApi = getApiEndpoint();
+      openModal('팀원 공유 및 데이터 동기화', `
+        <div class="space-y-4">
+          <form onsubmit="saveApiEndpointFromModal(event)" class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2.5">
+            <h4 class="text-sm font-bold text-emerald-900">1. Google Apps Script API 연결 (실시간 공유)</h4>
+            <p class="text-xs text-emerald-800 leading-relaxed">배포한 Apps Script 웹 앱 URL을 입력하면 팀원 모두가 같은 Google Sheets 데이터를 실시간으로 읽고 수정할 수 있습니다.</p>
+            <div class="flex gap-2">
+              <input name="apiUrl" type="url" value="${escapeHtml(currentApi)}" placeholder="https://script.google.com/macros/s/.../exec" class="flex-1 border border-emerald-300 bg-white rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500" />
+              <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0">연결 저장</button>
+            </div>
+            ${currentApi ? `
+              <button type="button" onclick="copyTeamInviteUrl()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline">
+                <i data-lucide="link" class="w-3.5 h-3.5"></i> API 주소가 포함된 팀원 초대 링크 복사
+              </button>
+            ` : ''}
+          </form>
+
+          <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 space-y-2">
+            <h4 class="text-sm font-bold text-indigo-900">1. 웹 공유 링크 생성 (현재 상태 포함)</h4>
+            <p class="text-xs text-indigo-700 leading-relaxed">현재 입력된 모든 프로젝트, 인원, 보고서, 일정, 업무 Pool 데이터를 URL 해시에 담아 팀원에게 바로 전달할 수 있습니다. (웹 서버에 이 HTML 파일을 올린 뒤 사용하세요.)</p>
+            <button type="button" onclick="copyShareLink()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+              <i data-lucide="link" class="w-3.5 h-3.5"></i> 공유 URL 복사하기
+            </button>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <h4 class="text-sm font-bold text-slate-900">2. JSON 백업 내보내기 / 가져오기</h4>
+            <p class="text-xs text-slate-500">팀 공용 드라이브나 메신저로 JSON 파일을 주고받아 동일한 데이터를 불러올 수 있습니다.</p>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" onclick="exportJsonFile()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> JSON 내보내기
+              </button>
+              <label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i> JSON 가져오기
+                <input type="file" accept=".json,application/json" onchange="importJsonFile(event)" class="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+            <button type="button" onclick="resetToDefaultState()" class="text-xs font-semibold text-rose-600 hover:text-rose-700">초기 샘플 데이터로 되돌리기</button>
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700">닫기</button>
+          </div>
+        </div>
+      `);
+    }
+
+    function copyTextToClipboard(text, successMsg) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast(successMsg, 'success');
+        }).catch(() => fallbackCopy(text, successMsg));
+      } else {
+        fallbackCopy(text, successMsg);
+      }
+    }
+
+    function fallbackCopy(text, successMsg) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(successMsg, 'success');
+      } catch (e) {
+        showToast('복사에 실패했습니다.', 'error');
+      }
+      document.body.removeChild(ta);
+    }
+
+    function copyShareLink() {
+      try {
+        const jsonStr = JSON.stringify(state);
+        const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+        const baseUrl = window.location.href.split('#')[0];
+        const shareUrl = `${baseUrl}#data=${encoded}`;
+        copyTextToClipboard(shareUrl, '공유 URL이 클립보드에 복사되었습니다.');
+      } catch (e) {
+        showToast('공유 링크 생성 중 오류가 발생했습니다.', 'error');
+      }
+    }
+
+    function exportJsonFile() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `teamhub_backup_${TODAY}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('JSON 백업 파일이 다운로드되었습니다.', 'success');
+    }
+
+    function importJsonFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          if (!parsed || !Array.isArray(parsed.projects)) {
+            showToast('올바른 TeamHub JSON 파일이 아닙니다.', 'error');
+            return;
+          }
+          state = { ...structuredClone(DEFAULT_STATE), ...parsed };
+          persistState();
+          closeModal();
+          renderAll();
+          showToast('데이터를 성공적으로 불러왔습니다.', 'success');
+        } catch (err) {
+          showToast('JSON 파일을 읽는 데 실패했습니다.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetToDefaultState() {
+      state = structuredClone(DEFAULT_STATE);
+      persistState();
+      closeModal();
+      renderAll();
+      showToast('초기 샘플 데이터로 복원되었습니다.', 'info');
+    }
+
+    function copyWeeklyMarkdown() {
+      const reports = state.weeklyReports.filter(w => state.weeklyFilterWeek === '전체' || w.week === state.weeklyFilterWeek);
+      const md = reports.map(r => {
+        const author = getMember(r.authorId);
+        return `### [${r.weekLabel}] ${author.name}\n- 금주 완료/진행:\n${r.completed}\n- 차주 계획:\n${r.nextPlan}\n- 이슈/요청: ${r.blockers || '없음'}`;
+      }).join('\n\n');
+      copyTextToClipboard(md || '등록된 주간보고가 없습니다.', '주간보고 요약이 클립보드에 복사되었습니다.');
+    }
+
+    function copyDailyMarkdown() {
+      const reports = state.dailyReports.filter(d => !state.dailyFilterDate || d.date === state.dailyFilterDate);
+      const md = reports.map(d => {
+        const author = getMember(d.authorId);
+        return `### [${d.date}] ${author.name} (${d.condition})\n- 어제: ${d.yesterday.replace(/\n/g, ' ')}\n- 오늘: ${d.today.replace(/\n/g, ' ')}\n- 블로커: ${d.blockers}`;
+      }).join('\n\n');
+      copyTextToClipboard(md || '등록된 일간보고가 없습니다.', '일간보고 요약이 클립보드에 복사되었습니다.');
+    }
+
+    // =========================================================================
+    // 12. GLOBAL SEARCH & TOASTS
+    // =========================================================================
+    function handleGlobalSearch(query) {
+      const q = query.trim().toLowerCase();
+      const panel = document.getElementById('global-search-panel');
+      const resultsEl = document.getElementById('global-search-results');
+      const summaryEl = document.getElementById('global-search-summary');
+
+      if (!q) {
+        panel.classList.add('hidden');
+        return;
+      }
+
+      const hits = [];
+      state.projects.forEach(p => {
+        if (p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)) {
+          hits.push({ type: '프로젝트', title: p.title, action: `setActiveTab('projects'); openProjectModal('${p.id}')` });
+        }
+      });
+      state.members.forEach(m => {
+        if (m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q) || m.part.toLowerCase().includes(q)) {
+          hits.push({ type: '인원', title: `${m.name} (${m.role})`, action: `setActiveTab('members'); openMemberModal('${m.id}')` });
+        }
+      });
+      state.knowledgePool.forEach(k => {
+        if (k.title.toLowerCase().includes(q) || k.content.toLowerCase().includes(q) || (k.tags || []).some(t => t.toLowerCase().includes(q))) {
+          hits.push({ type: '업무 Pool', title: k.title, action: `setActiveTab('pool'); openPoolDetailModal('${k.id}')` });
+        }
+      });
+      state.schedules.forEach(s => {
+        if (s.title.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)) {
+          hits.push({ type: '일정', title: `${s.date} · ${s.title}`, action: `setActiveTab('schedule'); selectCalendarDate('${s.date}')` });
+        }
+      });
+
+      panel.classList.remove('hidden');
+      summaryEl.textContent = `"${query}" 검색 결과 (${hits.length}건)`;
+      resultsEl.innerHTML = hits.length ? hits.slice(0, 9).map(h => `
+        <button type="button" onclick="${h.action}" class="text-left p-2.5 rounded-xl bg-white border border-indigo-100 hover:border-indigo-300 transition flex items-center justify-between gap-2">
+          <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(h.title)}</span>
+          <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold shrink-0">${h.type}</span>
+        </button>
+      `).join('') : '<p class="text-xs text-indigo-700 col-span-full">일치하는 항목이 없습니다.</p>';
+    }
+
+    function clearGlobalSearch() {
+      document.getElementById('global-search').value = '';
+      document.getElementById('global-search-panel').classList.add('hidden');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      const colors = {
+        success: 'bg-slate-900 text-white border-emerald-500',
+        error: 'bg-rose-600 text-white border-rose-700',
+        info: 'bg-slate-800 text-white border-slate-700'
+      };
+      el.className = `pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg border-l-4 text-xs font-medium transition transform translate-y-0 ${colors[type] || colors.info}`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('opacity-0');
+        setTimeout(() => el.remove(), 250);
+      }, 2800);
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('modal-root').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    // Boot
+    window.addEventListener('DOMContentLoaded', () => {
+      renderAll();
+      syncFromApi(true);
+    });
+  </script>
+</body>
+</html>
