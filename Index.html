@@ -6993,8 +6993,17 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
               ${isAdmin() ? `<label class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer transition">
                 <i data-lucide="upload" class="w-3.5 h-3.5"></i> JSON 가져오기
                 <input type="file" accept=".json,application/json" onchange="importJsonFile(event)" class="hidden" />
-              </label>` : '<span class="inline-flex items-center gap-1 text-[11px] text-slate-400"><i data-lucide="lock" class="w-3.5 h-3.5"></i>가져오기는 관리자만</span>'}
+              </label>
+              <button type="button" onclick="document.getElementById('json-paste-box').classList.toggle('hidden')" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition">
+                <i data-lucide="clipboard-paste" class="w-3.5 h-3.5"></i> 붙여넣기로 가져오기
+              </button>` : '<span class="inline-flex items-center gap-1 text-[11px] text-slate-400"><i data-lucide="lock" class="w-3.5 h-3.5"></i>가져오기는 관리자만</span>'}
             </div>
+            ${isAdmin() ? `
+            <div id="json-paste-box" class="hidden space-y-2">
+              <p class="text-[11px] text-slate-500">회사 보안 프로그램 때문에 파일이 안 올라가면, JSON 내용을 통째로 복사해서 아래에 붙여 넣으세요.</p>
+              <textarea id="json-paste-text" rows="5" placeholder='{"teamName": ... }' class="w-full border border-slate-300 rounded-lg px-3 py-2 text-[11px] font-mono bg-white"></textarea>
+              <div class="flex justify-end"><button type="button" onclick="importJsonText(document.getElementById('json-paste-text').value, '붙여 넣은 내용')" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold">붙여 넣은 내용 가져오기</button></div>
+            </div>` : ''}
           </div>
 
           ${isAdmin() && authOn() && auth.session ? `
@@ -7101,12 +7110,19 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(ev) {
+      reader.onload = ev => importJsonText(String(ev.target.result || ''), `"${file.name}" 파일`, true);
+      reader.onerror = () => showToast('파일을 읽지 못했습니다. 회사 보안 프로그램이 막았다면 [붙여넣기로 가져오기]를 써 주세요.', 'error');
+      reader.readAsText(file);
+    }
+
+    // 파일 또는 붙여 넣은 글자에서 가져오기 (회사 보안으로 파일이 암호화되면 붙여넣기를 씀)
+    function importJsonText(text, sourceLabel, fromFile) {
+      {
         let parsed;
         try {
-          parsed = JSON.parse(ev.target.result);
+          parsed = JSON.parse(String(text || '').replace(/^﻿/, '').trim());
         } catch (err) {
-          showToast('JSON 파일을 읽는 데 실패했습니다.', 'error');
+          showToast(fromFile ? 'JSON 파일을 읽지 못했습니다. 회사 보안 프로그램이 파일을 암호화했을 수 있습니다. [붙여넣기로 가져오기]를 써 주세요.' : '붙여 넣은 내용이 올바른 JSON이 아닙니다. 처음 { 부터 마지막 } 까지 모두 복사했는지 확인하세요.', 'error');
           return;
         }
         if (!parsed || !Array.isArray(parsed.projects)) {
@@ -7116,7 +7132,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
         const data = sanitizeData(parsed);
         askConfirm({
           title: 'JSON 가져오기',
-          message: `"${file.name}" 파일로 ${getApiEndpoint() ? '서버의 모든 데이터(팀원 전체 공유)' : '이 브라우저의 데이터'}를 바꿉니다.\n프로젝트 ${data.projects.length}건, 팀원 ${data.members.length}명, 일간보고 ${data.dailyReports.length}건\n\n현재 데이터는 사라집니다. 먼저 JSON 내보내기로 백업했는지 확인하세요.`,
+          message: `${sourceLabel}(으)로 ${getApiEndpoint() ? '서버의 모든 데이터(팀원 전체 공유)' : '이 브라우저의 데이터'}를 바꿉니다.\n프로젝트 ${data.projects.length}건, 팀원 ${data.members.length}명, 일간보고 ${data.dailyReports.length}건\n\n현재 데이터는 사라집니다. 먼저 JSON 내보내기로 백업했는지 확인하세요.`,
           confirmLabel: '가져오기',
           onConfirm: () => {
             if (!commit([{ op: 'replaceAll', data }])) return;
@@ -7124,8 +7140,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
             showToast('데이터를 성공적으로 불러왔습니다.', 'success');
           }
         });
-      };
-      reader.readAsText(file);
+      }
     }
 
     function resetToDefaultState() {
