@@ -1,7 +1,9 @@
 // TeamHub 앱 설치용 서비스 워커
 // - 화면 파일(같은 주소의 html·아이콘)만 다룸. 팀 데이터(Apps Script)·외부 CDN 요청은 건드리지 않음
 // - 항상 인터넷에서 먼저 받고(최신 화면), 인터넷이 끊겼을 때만 마지막으로 받은 화면을 보여 줌
-const CACHE = 'teamhub-shell-v1';
+// - 브라우저의 HTTP 보관본(GitHub Pages는 10분)도 건너뛰고 매번 서버에 바뀌었는지 물어봄
+//   (안 바뀌었으면 서버가 '그대로'라고만 답해서 다시 받지 않으므로 느려지지 않음)
+const CACHE = 'teamhub-shell-v2';
 const SHELL = ['./Index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -23,7 +25,7 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return; // 데이터·CDN은 브라우저가 그대로 처리
   if (!/(\.html|\.png|\.svg|\.webmanifest|\/)$/i.test(url.pathname)) return; // 화면 파일만 (목 서버의 /api 등 제외)
   e.respondWith(
-    fetch(req)
+    fetch(new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' }))
       .then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
