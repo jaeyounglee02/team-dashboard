@@ -120,7 +120,7 @@
         </div>
 
         <!-- 세계시간 (화면이 넓을 때만) -->
-        <div id="world-clocks" class="hidden xl:flex items-center gap-2 min-w-0 ml-auto"></div>
+        <div id="world-clocks" class="hidden xl:flex items-center gap-2 min-w-0 overflow-hidden ml-auto"></div>
 
         <div class="flex items-center gap-2 shrink-0">
           <button type="button" onclick="toggleHeaderSearch()" class="hidden md:inline-flex 2xl:hidden p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600" title="전체 검색" aria-label="전체 검색">
@@ -2197,8 +2197,24 @@
         </div>`;
       }).join('');
       if (typeof lucide !== 'undefined') lucide.createIcons();
+      fitClocks();
+    }
+    // 헤더 폭이 모자라면 뒤쪽 시계부터 숨김 (검색창 밑으로 겹쳐 보이지 않게)
+    function fitClocks() {
+      const box = document.getElementById('world-clocks');
+      if (!box) return;
+      const cards = [...box.children];
+      cards.forEach(c => { c.style.display = ''; });
+      for (let i = cards.length - 1; i >= 0 && box.scrollWidth > box.clientWidth + 1; i--) cards[i].style.display = 'none';
     }
     setInterval(renderClocks, 15000);
+    // 창 크기·사이드바가 바뀌어 헤더 폭이 달라지면 다시 맞춤
+    (function watchClockSpace() {
+      const refit = () => { clearTimeout(fitClocks._t); fitClocks._t = setTimeout(fitClocks, 100); };
+      window.addEventListener('resize', refit);
+      const header = document.getElementById('world-clocks')?.parentElement;
+      if (header && 'ResizeObserver' in window) new ResizeObserver(refit).observe(header);
+    })();
 
     function toggleHeaderSearch() {
       const box = document.getElementById('header-search-box');
