@@ -1614,6 +1614,7 @@
             <p class="text-[11px] text-slate-400 truncate">${escapeHtml(auth.user.email)}</p>
           </div>
           ${me ? `<button type="button" onclick="openMyStatusModal()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100"><i data-lucide="user-round-pen" class="w-4 h-4 text-indigo-600"></i>내 상태 바꾸기 <span class="ml-auto">${renderMemberStatusBadge(me.status)}</span></button>` : `<p class="px-3 py-2 text-[11px] text-amber-700">인원 관리에서 내 팀원 정보에 이 계정을 등록하면 보고서를 쓸 수 있습니다.</p>`}
+          <a href="manual.html" target="_blank" rel="noopener" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100"><i data-lucide="book-marked" class="w-4 h-4 text-slate-400"></i>사용 매뉴얼</a>
           <button type="button" onclick="logout()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-700 hover:bg-slate-100"><i data-lucide="log-out" class="w-4 h-4 text-slate-400"></i>로그아웃</button>
         </div>`;
       if (typeof lucide !== 'undefined') lucide.createIcons();
