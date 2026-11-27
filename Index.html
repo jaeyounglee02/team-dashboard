@@ -2153,6 +2153,51 @@
       }
     } catch (e) {}
 
+    // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
+    // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
+    // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
+    const APP_VERSION = '20261127-091246';
+    let updateNoticeShown = false;
+    async function checkForUpdate() {
+      if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
+      try {
+        const res = await fetch(`${location.pathname}?vcheck=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const m = (await res.text()).match(/const APP_VERSION = '([^']+)'/);
+        if (m && m[1] !== 'dev' && m[1] !== APP_VERSION) showUpdateNotice(m[1]);
+      } catch (e) {}
+    }
+    function reloadToVersion(v) {
+      const url = new URL(location.href);
+      url.searchParams.set('v', v);
+      location.replace(url.toString());
+    }
+    function showUpdateNotice(v) {
+      updateNoticeShown = true;
+      const bar = document.createElement('div');
+      bar.id = 'update-notice';
+      bar.className = 'fixed top-3 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 pl-4 pr-2 py-2 rounded-xl bg-slate-900 text-white shadow-xl text-sm max-w-[calc(100vw-2rem)]';
+      bar.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4 text-amber-300 shrink-0"></i><span>새 버전이 올라왔습니다.</span>
+        <button type="button" class="px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-400 font-semibold text-xs whitespace-nowrap">새로고침</button>
+        <button type="button" class="p-1 rounded-lg hover:bg-white/10 text-slate-300" aria-label="닫기"><i data-lucide="x" class="w-4 h-4"></i></button>`;
+      const [go, close] = bar.querySelectorAll('button');
+      go.onclick = () => {
+        if (sync.inflight || sync.pending.length) { showToast('저장 중입니다. 잠시 뒤 다시 눌러 주세요.', 'info'); return; }
+        reloadToVersion(v);
+      };
+      close.onclick = () => bar.remove();
+      document.body.appendChild(bar);
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    // 주소의 ?v= 는 새로 받은 뒤에는 필요 없으니 지움 (즐겨찾기·공유 주소가 지저분해지지 않게)
+    try {
+      const u = new URL(location.href);
+      if (u.searchParams.has('v')) { u.searchParams.delete('v'); history.replaceState(null, '', u.toString()); }
+    } catch (e) {}
+    setTimeout(checkForUpdate, 5000);
+    setInterval(checkForUpdate, 10 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
+
     window.addEventListener('beforeunload', e => {
       if (sync.inflight || sync.pending.length) {
         e.preventDefault();
