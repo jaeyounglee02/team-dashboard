@@ -245,7 +245,7 @@
 
     const COLLECTIONS = ['members', 'projects', 'weeklyReports', 'dailyReports', 'schedules', 'knowledgePool', 'notices', 'tripPlans', 'tripSites', 'tripStaffing', 'issues', 'parts', 'meetings'];
     const DATA_KEYS = ['teamName', ...COLLECTIONS];
-    const UI_PERSIST_KEYS = ['issueView', 'weeklyView', 'activeTab', 'projectViewMode', 'projectFilterStatus', 'projectFilterPriority', 'weeklyFilterMember', 'dailyFilterMember', 'memberFilterStatus', 'poolFilterCategory'];
+    const UI_PERSIST_KEYS = ['issueView', 'weeklyView', 'activeTab', 'projectViewMode', 'projectFilterStatus', 'projectFilterPriority', 'projectFilterCategory', 'weeklyFilterMember', 'dailyFilterMember', 'memberFilterStatus', 'poolFilterCategory'];
     const MEMBER_STATUSES = ['업무중', '회의중', '국내 출장 중', '해외 출장 중', '외근', '휴가'];
     const AWAY_STATUSES = ['국내 출장 중', '해외 출장 중', '외근'];
     // 일정에 자동으로 올라가는 부재 상태 (출장·외근 + 휴가)
@@ -501,6 +501,7 @@
       projectViewMode: 'kanban',
       projectFilterStatus: '전체',
       projectFilterPriority: '전체',
+      projectFilterCategory: '전체',
       weeklyFilterMember: '전체',
       dailyFilterMember: '전체',
       memberFilterStatus: '전체',
@@ -638,7 +639,7 @@
         {
           id: 'p1',
           title: '팀 협업 대시보드 v2 구축',
-          category: '내부 툴',
+          category: '내부 개발',
           status: '진행중',
           priority: '높음',
           progress: 72,
@@ -2210,7 +2211,7 @@
     // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
     // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
     // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
-    const APP_VERSION = '20261127-134916';
+    const APP_VERSION = '20261127-140820';
     let updateNoticeShown = false;
     async function checkForUpdate() {
       if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
@@ -2821,6 +2822,7 @@
     // 4. PROJECT MANAGEMENT VIEW
     // =========================================================================
     const PROJECT_STATUSES = ['기획/대기', '진행중', '검토중', '완료'];
+    const PROJECT_CATEGORIES = ['신규 설비', '개조·추가', '성능 개선', '유지보수·AS', '내부 개발', '기타'];
     const PRIORITIES = ['긴급', '높음', '보통', '낮음'];
 
     function renderPriorityBadge(priority) {
@@ -2852,15 +2854,24 @@
     function setProjectFilter(type, val) {
       if (type === 'status') state.projectFilterStatus = val;
       if (type === 'priority') state.projectFilterPriority = val;
+      if (type === 'category') state.projectFilterCategory = val;
       saveUi();
       renderAll();
+    }
+
+    // 분류 목록 + 예전에 직접 적어 둔 분류(목록에 없는 것)도 고를 수 있게 뒤에 붙임
+    function projectCategoryOptions(keep) {
+      const extra = [...new Set(state.projects.map(p => p.category).concat(keep ? [keep] : []))]
+        .filter(c => c && !PROJECT_CATEGORIES.includes(c));
+      return [...PROJECT_CATEGORIES, ...extra];
     }
 
     function renderProjects() {
       const filtered = state.projects.filter(p => {
         const matchStatus = state.projectFilterStatus === '전체' || p.status === state.projectFilterStatus;
         const matchPriority = state.projectFilterPriority === '전체' || p.priority === state.projectFilterPriority;
-        return matchStatus && matchPriority;
+        const matchCategory = !state.projectFilterCategory || state.projectFilterCategory === '전체' || p.category === state.projectFilterCategory;
+        return matchStatus && matchPriority && matchCategory;
       });
 
       return `
@@ -2873,6 +2884,10 @@
             <select onchange="setProjectFilter('priority', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
               <option value="전체" ${state.projectFilterPriority === '전체' ? 'selected' : ''}>우선순위: 전체</option>
               ${PRIORITIES.map(pr => `<option value="${pr}" ${state.projectFilterPriority === pr ? 'selected' : ''}>${pr}</option>`).join('')}
+            </select>
+            <select onchange="setProjectFilter('category', this.value)" class="text-xs sm:text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50 focus:bg-white outline-none">
+              <option value="전체" ${(state.projectFilterCategory || '전체') === '전체' ? 'selected' : ''}>분류: 전체</option>
+              ${projectCategoryOptions().map(c => `<option value="${escapeHtml(c)}" ${state.projectFilterCategory === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
             </select>
           </div>
           <div class="flex items-center gap-2">
@@ -3832,7 +3847,9 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">분류</label>
-              <input name="category" value="${item ? escapeHtml(item.category) : '일반'}" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+              <select name="category" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 bg-white">
+                ${projectCategoryOptions(item ? item.category : '').map(c => `<option value="${escapeHtml(c)}" ${(item ? item.category : PROJECT_CATEGORIES[0]) === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+              </select>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">마감일</label>
@@ -3892,7 +3909,7 @@
       const data = {
         id: id || uid('p'),
         title: fd.get('title').trim(),
-        category: fd.get('category').trim() || '일반',
+        category: String(fd.get('category') || '').trim() || PROJECT_CATEGORIES[0],
         dueDate: fd.get('dueDate') || TODAY,
         status: fd.get('status'),
         priority: fd.get('priority'),
