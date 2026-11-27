@@ -87,6 +87,7 @@
       <a class="sub" href="#login">로그인과 가입</a>
       <a class="sub" href="#phone">휴대폰에 설치</a>
       <a href="#layout">2. 화면 구성</a>
+      <a class="sub" href="#remind">Remind 알림 🔔</a>
       <a href="#routine">3. 매일·매주 할 일</a>
       <a class="sub" href="#daily">일간보고</a>
       <a class="sub" href="#weekly">주간보고</a>
@@ -123,6 +124,7 @@
           <option value="#start">1. 시작하기</option>
           <option value="#phone">　휴대폰에 설치</option>
           <option value="#layout">2. 화면 구성</option>
+          <option value="#remind">　Remind 알림 🔔</option>
           <option value="#daily">3. 일간보고</option>
           <option value="#weekly">　주간보고</option>
           <option value="#format">　글자 서식</option>
@@ -191,7 +193,7 @@
         <div class="table-scroll"><table>
           <tr><th>위치</th><th>내용</th></tr>
           <tr><td>왼쪽 메뉴</td><td>팀 현황부터 업무 Pool까지 12개 메뉴. 확인할 것이 있는 메뉴에는 숫자가 붙습니다. 맨 아래는 저장 상태(<span class="tag">Sheets 동기화됨</span>).</td></tr>
-          <tr><td>위쪽 줄</td><td>한국 시각과 날짜, <b>세계시간</b>(출장 사이트 현지 시각, 해·달 아이콘과 근무시간 표시), <b>전체 검색</b>, <span class="btn">+ 빠른 등록</span>, <span class="btn">새 창</span>, <span class="btn">공유</span>, 내 프로필</td></tr>
+          <tr><td>위쪽 줄</td><td>한국 시각과 날짜, <b>세계시간</b>(출장 사이트 현지 시각, 해·달 아이콘과 근무시간 표시), <b>전체 검색</b>, <span class="btn">+ 빠른 등록</span>, <span class="btn">🔔</span> Remind 알림, <span class="btn">새 창</span>, <span class="btn">공유</span>, 내 프로필</td></tr>
           <tr><td>왼쪽 아래 보라색 버튼</td><td>팀 대화방. 안 읽은 메시지 수가 빨간 숫자로, 나를 부른 메시지(@멘션)가 있으면 주황색으로 표시됩니다.</td></tr>
           <tr><td>휴대폰 아래쪽</td><td>현황 · 일간보고 · 이슈 · 일정 + <b>전체 메뉴</b> 버튼</td></tr>
         </table></div>
@@ -200,6 +202,25 @@
           <li><b>빠른 등록</b>: 어느 화면에서든 일정, 이슈, 보고 등을 바로 추가합니다.</li>
           <li><b>내 상태 바꾸기</b>: 오른쪽 위 내 프로필을 눌러 <span class="tag">업무중</span><span class="tag">회의중</span><span class="tag">국내 출장 중</span><span class="tag">해외 출장 중</span><span class="tag">외근</span><span class="tag">휴가</span> 중에서 고릅니다.</li>
         </ul>
+      
+        <h3 id="remind">Remind 알림 🔔 (나에게 온 일)</h3>
+        <p>사이트에 들어오면, <b>지난번 확인한 뒤로 나와 관련해 새로 생긴 일</b>이 있을 때 <b>"🔔 나에게 온 알림"</b> 창이 자동으로 뜹니다.</p>
+        <div class="table-scroll"><table>
+          <tr><th>알려 주는 일</th><th>언제</th></tr>
+          <tr><td>회의 할 일</td><td>회의록에서 나를 담당자로 지정했을 때</td></tr>
+          <tr><td>이슈</td><td>나에게 새로 배정되었거나, 내 이슈의 <b>상태가 바뀌었을 때</b></td></tr>
+          <tr><td>프로젝트</td><td>담당자로 추가되었을 때</td></tr>
+          <tr><td>공지</td><td>다른 사람이 새 공지를 올렸을 때 (<span class="tag">중요</span> 공지가 위로)</td></tr>
+          <tr><td>기한 지남</td><td>기한이 지난 내 할 일·이슈 (하루에 한 번)</td></tr>
+          <tr><td>@멘션</td><td>대화방에서 나를 부른 메시지가 있을 때 (누르면 대화방이 열림)</td></tr>
+        </table></div>
+        <ul>
+          <li>각 줄을 누르면 해당 회의록·이슈·프로젝트·공지가 바로 열립니다.</li>
+          <li><span class="btn">확인</span>을 누르거나 창을 닫으면 본 것으로 기록되어, 다음에는 그 뒤에 생긴 일만 알려 줍니다.</li>
+          <li>오른쪽 위 <span class="btn">🔔</span>에 <b>새 알림 수</b>가 빨간 숫자로 붙습니다. 누르면 언제든 다시 볼 수 있고, 아래쪽에서 <b>지금 내 일</b>(회의 할 일·담당 이슈·담당 프로젝트 수)도 확인할 수 있습니다.</li>
+          <li>글을 쓰는 중에는 방해하지 않도록 알림 창이 뜨지 않습니다.</li>
+        </ul>
+        <div class="tip"><b>💡</b>무엇을 봤는지는 <b>기기(브라우저)마다</b> 기억합니다. PC에서 확인한 알림이 휴대폰에서 한 번 더 보일 수 있습니다. 새 기기에서 처음 들어오면 기존 일은 쌓아 두지 않고, 그 이후 생긴 일부터 알려 줍니다(기한 지난 일은 바로 알려 줌).</div>
       </section>
 
       <!-- 3. 매일·매주 할 일 -->
@@ -264,6 +285,7 @@
         <h3 id="overview">팀 현황</h3>
         <p>들어오면 처음 보이는 화면입니다.</p>
         <ul>
+          <li><b>내 할 일</b>(맨 위, 나에게 할 일이 있을 때만): 회의록에서 나에게 배정된, 아직 안 끝난 일. 기한 빠른 순으로 D-day가 붙고, 지난 건 빨간색입니다. 앞의 체크박스를 누르면 바로 완료되고, 글자를 누르면 회의록이 열립니다.</li>
           <li><b>오늘 확인 필요</b>: 마감 임박·지연 프로젝트(7일 이내), 블로커·지원 요청, 긴급·기한 지난 이슈, 오늘 일간보고 미작성자. 해결되면 자동으로 사라집니다.</li>
           <li>최근 공지, 오늘 일정, 출장·외근 중인 인원, 다가오는 일정.</li>
         </ul>
