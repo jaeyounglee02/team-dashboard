@@ -52,6 +52,14 @@
     .scrollbar-thin::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+    /* 긴 보고 접어 보이기 (전체 보기 버튼으로 펼침) */
+    .report-clamp { position: relative; }
+    .report-clamp.is-clamped:not(.is-open) { max-height: var(--clamp-h, 20rem); overflow: hidden; }
+    .report-clamp.is-clamped:not(.is-open)::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3.5rem; pointer-events: none;
+      background: linear-gradient(to bottom, rgba(255,255,255,0), var(--clamp-bg, #fff));
+    }
+    @media print { .report-clamp.is-clamped:not(.is-open) { max-height: none; overflow: visible; } .report-clamp::after, .report-clamp-btn { display: none !important; } }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-100 selection:text-indigo-800">
@@ -187,7 +195,7 @@
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
         <div class="min-w-0 flex items-baseline gap-2 flex-wrap">
           <h3 id="modal-title" class="text-base font-bold text-slate-900">제목</h3>
-          <span id="modal-hint" class="hidden text-[11px] font-semibold text-amber-600">작성 중이에요 · 닫으려면 X 또는 취소</span>
+          <span id="modal-hint" class="hidden text-[11px] font-semibold text-amber-600">닫으려면 X 또는 취소를 누르세요</span>
         </div>
         <button type="button" onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" aria-label="모달 닫기">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -2214,7 +2222,7 @@
     // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
     // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
     // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
-    const APP_VERSION = '20261127-160016';
+    const APP_VERSION = '20261127-162705';
     let updateNoticeShown = false;
     async function checkForUpdate() {
       if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
@@ -2513,7 +2521,40 @@
           main.innerHTML = renderOverview();
       }
       lucide.createIcons();
+      refreshReportClamps();
     }
+
+    // ---- 긴 보고 접어 보이기: 정해진 높이를 넘는 보고만 접고 [전체 보기] 버튼을 보여 줌
+    const openReportClamps = new Set(); // 펼쳐 둔 보고 id (다시 그려도 유지)
+    function reportClampButton(id) {
+      return `<button type="button" data-clamp-btn="${id}" onclick="toggleReportClamp('${id}')" class="report-clamp-btn hidden w-full flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold text-indigo-600 hover:bg-indigo-50 transition"></button>`;
+    }
+    function refreshReportClamps() {
+      document.querySelectorAll('.report-clamp[data-clamp-id]').forEach(box => {
+        const id = box.dataset.clampId;
+        const btn = document.querySelector(`[data-clamp-btn="${id}"]`);
+        const open = openReportClamps.has(id);
+        box.classList.toggle('is-open', open);
+        box.classList.remove('is-clamped');
+        const limit = parseFloat(getComputedStyle(box).getPropertyValue('--clamp-h')) * parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const tooLong = box.scrollHeight > limit + 24; // 조금 넘는 정도는 그냥 다 보여줌
+        box.classList.toggle('is-clamped', tooLong);
+        if (!btn) return;
+        btn.classList.toggle('hidden', !tooLong);
+        btn.innerHTML = open ? '접기 <span aria-hidden="true">▴</span>' : '전체 보기 <span aria-hidden="true">▾</span>';
+      });
+    }
+    function toggleReportClamp(id) {
+      const wasOpen = openReportClamps.has(id);
+      if (wasOpen) openReportClamps.delete(id); else openReportClamps.add(id);
+      refreshReportClamps();
+      if (wasOpen) { // 접으면 그 보고 위치로 돌아가기
+        const box = document.querySelector(`.report-clamp[data-clamp-id="${id}"]`);
+        const card = box && box.parentElement;
+        if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
+    }
+    window.addEventListener('resize', () => { clearTimeout(window.__clampT); window.__clampT = setTimeout(refreshReportClamps, 150); });
 
     function destroyCharts() {
       Object.values(chartInstances).forEach(ch => {
@@ -3195,16 +3236,19 @@
                     <button type="button" onclick="deleteItem('weeklyReports', '${r.id}')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50">삭제</button>` : readOnlyNote()}
                   </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div class="bg-slate-50 rounded-xl p-3.5">
+                <div class="grid grid-cols-1 md:grid-cols-[2fr_1fr] md:grid-rows-[auto_1fr] gap-4 text-sm">
+                  <div class="bg-slate-50 rounded-xl p-3.5 md:row-span-2">
                     <h4 class="text-xs font-bold text-emerald-700 mb-2">금주 완료 및 진행 사항</h4>
-                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.completed)}</p>
+                    <div class="report-clamp ${openReportClamps.has(r.id) ? 'is-open' : ''}" data-clamp-id="${r.id}" style="--clamp-h:20rem; --clamp-bg:#f8fafc">
+                      <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.completed)}</p>
+                    </div>
+                    ${reportClampButton(r.id)}
                   </div>
-                  <div class="bg-slate-50 rounded-xl p-3.5">
+                  <div class="bg-slate-50 rounded-xl p-3.5 md:self-start">
                     <h4 class="text-xs font-bold text-indigo-700 mb-2">차주 계획</h4>
                     <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.nextPlan)}</p>
                   </div>
-                  <div class="bg-slate-50 rounded-xl p-3.5">
+                  <div class="bg-slate-50 rounded-xl p-3.5 md:self-start">
                     <h4 class="text-xs font-bold text-amber-700 mb-2">이슈 및 지원 요청</h4>
                     <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.blockers || '특이사항 없음')}</p>
                   </div>
@@ -3280,7 +3324,7 @@
                     <button type="button" onclick="deleteItem('dailyReports', '${d.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="삭제"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : readOnlyNote()}
                   </div>
                 </div>
-                <div class="space-y-2.5 text-xs">
+                <div class="report-clamp space-y-2.5 text-xs ${openReportClamps.has(d.id) ? 'is-open' : ''}" data-clamp-id="${d.id}" style="--clamp-h:17rem">
                   ${isLegacyDaily(d) ? `
                   <div>
                     <span class="font-bold text-slate-500 block mb-1">어제 한 일 <span class="font-normal text-slate-400">(예전 형식)</span></span>
@@ -3308,6 +3352,7 @@
                     </div>
                   ` : ''}
                 </div>
+                ${reportClampButton(d.id)}
               </div>
             `;
           }).join('') : '<div class="col-span-full bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-400">해당 날짜/조건의 일간보고가 없습니다.</div>'}
@@ -4102,7 +4147,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">금주 완료 및 진행 사항 *</label>
-            <textarea required name="completed" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.completed) : '• '}</textarea>
+            <textarea required name="completed" rows="10" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.completed) : '• '}</textarea>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">차주 계획 *</label>
@@ -7427,7 +7472,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
 
     // Close modal on backdrop click
     // - 글 선택 중 마우스를 바깥에서 떼는 경우는 닫지 않음 (누른 곳과 뗀 곳이 모두 바깥일 때만)
-    // - 입력한 내용이 있으면 바깥 클릭으로 닫지 않음 (X 또는 취소로만 닫힘)
+    // - 입력 칸이 있는 창(작성·수정 창)은 바깥 클릭으로 닫지 않음 (X 또는 취소로만 닫힘)
     let modalPressOnBackdrop = false;
     document.getElementById('modal-root').addEventListener('mousedown', function(e) {
       modalPressOnBackdrop = e.target === this;
@@ -7438,7 +7483,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
       const pressed = modalPressOnBackdrop;
       modalPressOnBackdrop = false;
       if (e.target !== this || !pressed) return;
-      if (modalDirty) {
+      if (modalDirty || document.querySelector('#modal-body input:not([type=hidden]), #modal-body textarea, #modal-body select')) {
         const box = document.getElementById('modal-box');
         if (box.animate) box.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], { duration: 220 });
         document.getElementById('modal-hint').classList.remove('hidden');
