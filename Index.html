@@ -145,6 +145,10 @@
             <i data-lucide="plus" class="w-4 h-4"></i>
             <span class="hidden sm:inline xl:hidden 2xl:inline">빠른 등록</span>
           </button>
+          <button id="remind-btn" type="button" onclick="openRemindModal()" title="나에게 온 알림" aria-label="나에게 온 알림" class="hidden relative p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 order-last">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <span id="remind-badge" class="hidden absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-[1.1rem] text-center"></span>
+          </button>
           <div id="user-chip" class="hidden relative order-last"></div>
           <a id="open-standalone-btn" href="#" target="_blank" rel="noopener" class="hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-medium transition" title="새 창에서 열기 (사이트 안에서 로그인·내려받기가 막힐 때)">
             <i data-lucide="external-link" class="w-4 h-4 text-indigo-600"></i>
@@ -1273,6 +1277,7 @@
           }
           const changed = applyServerData(res.data, res.version);
           if (changed || firstLoad) renderAll();
+          if (firstLoad) setTimeout(maybeAutoRemind, 1200); // 들어오자마자 나에게 온 일 알려 주기
           if (sync.pending.length) {
             sync.failed = false;
             flushPending();
@@ -2237,7 +2242,7 @@
     // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
     // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
     // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
-    const APP_VERSION = '20261127-164151';
+    const APP_VERSION = '20261127-170707';
     let updateNoticeShown = false;
     async function checkForUpdate() {
       if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
@@ -2537,6 +2542,7 @@
       }
       lucide.createIcons();
       refreshReportClamps();
+      updateRemindBell();
     }
 
     // ---- 긴 보고 접어 보이기: 정해진 높이를 넘는 보고만 접고 [전체 보기] 버튼을 보여 줌
@@ -2648,6 +2654,164 @@
       return { dueSoon, blockers, hotIssues, rentDue, dailyMissing, dailyPastDeadline, checkCount };
     }
 
+    // =========================================================================
+    // Remind: 지난번 확인 이후 나와 관련해 새로 생긴 일 (이 기기 기준으로 기억)
+    // =========================================================================
+    const REMIND_KEY_PREFIX = 'teamhub_remind_v1_';
+    const ISSUE_OPEN = i => !['해결', '종료'].includes(i.status);
+    function remindStore() {
+      const me = myMemberId();
+      if (!me) return null;
+      try { return JSON.parse(localStorage.getItem(REMIND_KEY_PREFIX + me) || 'null'); } catch (e) { return null; }
+    }
+    function saveRemindStore(v) {
+      const me = myMemberId();
+      if (!me) return;
+      try { localStorage.setItem(REMIND_KEY_PREFIX + me, JSON.stringify(v)); } catch (e) {}
+    }
+    // 지금 나와 관련된 항목 전체 (key 가 바뀌면 '새 소식')
+    function remindItems() {
+      const me = myMemberId();
+      if (!me) return [];
+      const out = [];
+      state.meetings.forEach(m => m.actions.forEach(a => {
+        if (a.done || a.assigneeId !== me) return;
+        out.push({ key: 'ma:' + a.id, group: 'ma', icon: 'list-checks', color: 'text-indigo-600', label: '회의 할 일', text: a.text, sub: m.title, due: a.dueDate, go: `openMeetingModal('${m.id}')` });
+      }));
+      state.issues.forEach(i => {
+        if (!(i.assigneeIds || []).includes(me)) return;
+        out.push({ key: `is:${i.id}:${i.status}`, id: 'is:' + i.id + ':', group: 'is', open: ISSUE_OPEN(i), icon: 'bug', color: 'text-rose-600', label: '이슈', text: i.title, sub: i.status + (i.severity === '긴급' ? ' · 긴급' : ''), due: ISSUE_OPEN(i) ? i.dueDate : '', go: `openIssueModal('${i.id}')` });
+      });
+      state.projects.forEach(p => {
+        if (p.status === '완료' || !(p.assigneeIds || []).includes(me)) return;
+        out.push({ key: 'pj:' + p.id, group: 'pj', icon: 'folder-kanban', color: 'text-emerald-600', label: '프로젝트', text: p.title, sub: p.status + (p.dueDate ? ' · 마감 ' + shortDate(p.dueDate) : ''), due: '', go: `openProjectModal('${p.id}')` });
+      });
+      const since = addDays(TODAY, -14);
+      state.notices.forEach(n => {
+        if (n.authorId === me || (n.date || '') < since) return;
+        out.push({ key: 'nt:' + n.id, group: 'nt', icon: 'megaphone', color: 'text-amber-600', label: n.important ? '중요 공지' : '공지', text: n.title, sub: shortDate(n.date), due: '', go: `openNoticeModal('${n.id}')`, quiet: !n.important });
+      });
+      return out;
+    }
+    // 새 소식 = 저장된 key 에 없는 항목. 처음 쓰는 기기는 지금 상태를 기준으로 삼음(한꺼번에 쏟아지지 않게)
+    function remindState() {
+      const items = remindItems();
+      let st = remindStore();
+      if (!st || !Array.isArray(st.seen)) { st = { seen: items.map(x => x.key), overdueDay: '' }; saveRemindStore(st); }
+      const seen = new Set(st.seen);
+      const fresh = items.filter(x => !seen.has(x.key) && !(x.group === 'is' && !x.open && ![...seen].some(k => k.startsWith(x.id))));
+      fresh.forEach(x => { if (x.group === 'is') x.change = [...seen].some(k => k.startsWith(x.id)) ? '상태 변경' : '새로 배정'; });
+      const overdue = items.filter(x => x.due && x.due < TODAY && (x.group !== 'is' || x.open));
+      const mentions = chatAvailable() ? chatUnread().filter(chatMentionsMe).length : 0;
+      return { items, fresh, overdue, mentions, st };
+    }
+    function remindCount() {
+      if (!authOn() || !auth.session || !myMemberId()) return 0;
+      const r = remindState();
+      return r.fresh.filter(x => !x.quiet).length + r.fresh.filter(x => x.quiet).length + (r.st.overdueDay !== TODAY ? r.overdue.length : 0);
+    }
+    function updateRemindBell() {
+      const btn = document.getElementById('remind-btn');
+      if (!btn) return;
+      const on = authOn() && !!auth.session && !!myMemberId();
+      btn.classList.toggle('hidden', !on);
+      if (!on) return;
+      const n = remindCount();
+      const badge = document.getElementById('remind-badge');
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.classList.toggle('hidden', !n);
+      btn.classList.toggle('text-rose-600', !!n);
+    }
+    function maybeAutoRemind() {
+      if (!authOn() || !auth.session || !myMemberId()) return;
+      if (!document.getElementById('modal-root').classList.contains('hidden')) return; // 다른 창을 쓰는 중이면 방해하지 않음
+      const r = remindState();
+      if (r.fresh.length || r.mentions || (r.overdue.length && r.st.overdueDay !== TODAY)) openRemindModal(true);
+    }
+    function openRemindModal(auto) {
+      const r = remindState();
+      const row = (x, extra = '') => {
+        const late = x.due && x.due < TODAY;
+        return `
+          <button type="button" onclick="closeModal(); ${x.go}" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border ${late ? 'border-rose-200 bg-rose-50/50' : 'border-slate-200 bg-white'} hover:border-indigo-300 text-left">
+            <i data-lucide="${x.icon}" class="w-4 h-4 ${x.color} shrink-0"></i>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(x.text)}</p>
+              <p class="text-[11px] text-slate-500 truncate">${escapeHtml(x.label)}${extra ? ' · ' + extra : ''}${x.sub ? ' · ' + escapeHtml(x.sub) : ''}</p>
+            </div>
+            ${x.due ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold shrink-0 ${late ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'}">~${x.due.slice(5).replace('-', '/')} ${dDayLabel(daysUntil(x.due))}</span>` : ''}
+          </button>`;
+      };
+      const section = (title, cls, html) => html ? `<div class="space-y-1.5"><p class="text-xs font-bold ${cls}">${title}</p>${html}</div>` : '';
+      const freshSorted = [...r.fresh].sort((a, b) => (a.quiet ? 1 : 0) - (b.quiet ? 1 : 0));
+      const mine = r.items.filter(x => x.group !== 'nt' && (x.group !== 'is' || x.open));
+      const counts = ['ma', 'is', 'pj'].map(g => mine.filter(x => x.group === g).length);
+      const body = `
+        <div class="space-y-4">
+          ${r.mentions ? `<button type="button" onclick="closeModal(); toggleChat(true)" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:border-amber-300 text-left">
+            <i data-lucide="at-sign" class="w-4 h-4 text-amber-600 shrink-0"></i><span class="text-sm font-semibold text-amber-900">대화방에서 나를 부른 메시지 ${r.mentions}건</span><span class="ml-auto text-xs text-amber-700">대화방 열기 →</span></button>` : ''}
+          ${section(`새로 생긴 일 ${r.fresh.length}건`, 'text-indigo-700', freshSorted.map(x => row(x, x.change || '새로 배정')).join(''))}
+          ${section(`기한 지남 ${r.overdue.length}건`, 'text-rose-700', r.overdue.map(x => row(x)).join(''))}
+          ${!r.fresh.length && !r.overdue.length && !r.mentions ? '<p class="text-sm text-slate-500 text-center py-3">새로 온 알림이 없습니다 🙂</p>' : ''}
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1">
+            <span class="font-bold text-slate-700">지금 내 일</span>
+            <button type="button" onclick="closeModal(); state.meetingFilter = { ...(state.meetingFilter || {}), quick: 'mine' }; setActiveTab('meetings')" class="hover:text-indigo-700">회의 할 일 <b>${counts[0]}</b></button>
+            <button type="button" onclick="closeModal(); setActiveTab('issues')" class="hover:text-indigo-700">담당 이슈 <b>${counts[1]}</b></button>
+            <button type="button" onclick="closeModal(); setActiveTab('projects')" class="hover:text-indigo-700">담당 프로젝트 <b>${counts[2]}</b></button>
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-[11px] text-slate-400">오른쪽 위 🔔 를 누르면 언제든 다시 볼 수 있습니다.</p>
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white">확인</button>
+          </div>
+        </div>`;
+      openModal(auto ? '🔔 나에게 온 알림' : '🔔 나에게 온 알림', body);
+      // 본 것으로 기록 (다음 접속 때는 그 뒤에 생긴 것만)
+      saveRemindStore({ seen: r.items.map(x => x.key), overdueDay: TODAY });
+      updateRemindBell();
+    }
+
+    // 나에게 배정된, 아직 안 끝난 회의 할 일 (기한 빠른 순, 기한 없으면 뒤로)
+    function myOpenMeetingActions() {
+      const me = myMemberId();
+      if (!me) return [];
+      return state.meetings
+        .flatMap(m => m.actions.filter(a => !a.done && a.assigneeId === me).map(a => ({ m, a })))
+        .sort((x, y) => (x.a.dueDate || '9999').localeCompare(y.a.dueDate || '9999') || y.m.date.localeCompare(x.m.date));
+    }
+
+    function renderOverviewMyTodos() {
+      const list = myOpenMeetingActions();
+      if (!list.length) return '';
+      const overdue = list.filter(({ a }) => a.dueDate && a.dueDate < TODAY).length;
+      const SHOW = 5;
+      return `
+        <section class="bg-indigo-50/70 border border-indigo-200 rounded-2xl shadow-sm p-4">
+          <div class="flex flex-wrap items-center gap-2 mb-2.5">
+            <i data-lucide="list-checks" class="w-4 h-4 text-indigo-600"></i>
+            <h3 class="text-sm font-bold text-indigo-900">내 할 일 <span class="text-indigo-600">${list.length}건</span></h3>
+            ${overdue ? `<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[11px] font-bold">기한 지남 ${overdue}</span>` : ''}
+            <span class="text-xs text-indigo-700/70">· 회의록에서 나에게 배정된 일 · 체크하면 완료</span>
+            <button type="button" onclick="state.meetingFilter = { ...(state.meetingFilter || {}), quick: 'mine' }; setActiveTab('meetings')" class="ml-auto text-xs font-medium text-indigo-600 hover:text-indigo-800 shrink-0">회의록 →</button>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
+            ${list.slice(0, SHOW).map(({ m, a }) => {
+              const late = a.dueDate && a.dueDate < TODAY;
+              const diff = a.dueDate ? daysUntil(a.dueDate) : null;
+              return `
+              <div class="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white border ${late ? 'border-rose-200' : 'border-indigo-100'} min-w-0">
+                <input type="checkbox" title="완료로 표시" onchange="toggleMeetingAction('${m.id}', '${a.id}', this.checked)" class="w-4 h-4 rounded text-indigo-600 shrink-0 cursor-pointer" />
+                <div class="min-w-0 flex-1 cursor-pointer" onclick="openMeetingModal('${m.id}')">
+                  <p class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(a.text)}</p>
+                  <p class="text-[11px] text-slate-500 truncate">${escapeHtml(m.title)} · ${shortDate(m.date)}</p>
+                </div>
+                ${a.dueDate ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold shrink-0 ${late ? 'bg-rose-600 text-white' : diff <= DUE_DANGER_DAYS ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'}">~${a.dueDate.slice(5).replace('-', '/')} ${dDayLabel(diff)}</span>` : '<span class="text-[11px] text-slate-400 shrink-0">기한 없음</span>'}
+              </div>`;
+            }).join('')}
+          </div>
+          ${list.length > SHOW ? `<p class="text-[11px] text-indigo-700/70 mt-2">외 ${list.length - SHOW}건 · 회의록에서 모두 볼 수 있습니다</p>` : ''}
+        </section>`;
+    }
+
     function renderOverview() {
       const ov = computeOverview();
       const away = workMembers().filter(isAway);
@@ -2743,6 +2907,8 @@
       const linkBtn = (tab, label) => `<button type="button" onclick="setActiveTab('${tab}')" class="ml-auto text-xs font-medium text-indigo-600 hover:text-indigo-800 shrink-0">${label} →</button>`;
 
       return `
+        ${renderOverviewMyTodos()}
+
         <!-- ① 오늘 확인 필요 -->
         <section class="bg-white rounded-2xl border ${checkTotal ? 'border-rose-200' : 'border-emerald-200'} shadow-sm">
           <div class="px-5 py-3.5 border-b ${checkTotal ? 'border-rose-100 bg-rose-50/60' : 'border-emerald-100 bg-emerald-50/60'} rounded-t-2xl flex flex-wrap items-center gap-2">
