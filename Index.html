@@ -1086,6 +1086,21 @@
         .replace(/'/g, '&#39;');
     }
 
+    // ---- 간단 서식: **굵게**  !!빨강!!  ==형광펜==  (한 줄 안에서만)
+    const RICH_RULES = [
+      [/\*\*([^\n]+?)\*\*/g, '<strong class="font-bold text-slate-900">$1</strong>'],
+      [/!!([^\n]+?)!!/g, '<span class="font-semibold text-rose-600">$1</span>'],
+      [/==([^\n]+?)==/g, '<mark class="bg-yellow-200 text-inherit rounded-sm px-0.5">$1</mark>']
+    ];
+    function richText(str) {
+      let h = escapeHtml(str);
+      RICH_RULES.forEach(([re, rep]) => { h = h.replace(re, rep); });
+      return h;
+    }
+    function plainText(str) { // 엑셀·복사용: 서식 기호 빼기
+      return String(str == null ? '' : str).replace(/\*\*([^\n]+?)\*\*/g, '$1').replace(/!!([^\n]+?)!!/g, '$1').replace(/==([^\n]+?)==/g, '$1');
+    }
+
     function getMember(id) {
       return state.members.find(m => m.id === id) || { id: '', name: '미배정', initials: '?', color: 'bg-slate-400', role: '' };
     }
@@ -2222,7 +2237,7 @@
     // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
     // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
     // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
-    const APP_VERSION = '20261127-162705';
+    const APP_VERSION = '20261127-164151';
     let updateNoticeShown = false;
     async function checkForUpdate() {
       if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
@@ -3240,17 +3255,17 @@
                   <div class="bg-slate-50 rounded-xl p-3.5 md:row-span-2">
                     <h4 class="text-xs font-bold text-emerald-700 mb-2">금주 완료 및 진행 사항</h4>
                     <div class="report-clamp ${openReportClamps.has(r.id) ? 'is-open' : ''}" data-clamp-id="${r.id}" style="--clamp-h:20rem; --clamp-bg:#f8fafc">
-                      <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.completed)}</p>
+                      <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${richText(r.completed)}</p>
                     </div>
                     ${reportClampButton(r.id)}
                   </div>
                   <div class="bg-slate-50 rounded-xl p-3.5 md:self-start">
                     <h4 class="text-xs font-bold text-indigo-700 mb-2">차주 계획</h4>
-                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.nextPlan)}</p>
+                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${richText(r.nextPlan)}</p>
                   </div>
                   <div class="bg-slate-50 rounded-xl p-3.5 md:self-start">
                     <h4 class="text-xs font-bold text-amber-700 mb-2">이슈 및 지원 요청</h4>
-                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(r.blockers || '특이사항 없음')}</p>
+                    <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">${richText(r.blockers || '특이사항 없음')}</p>
                   </div>
                 </div>
               </div>
@@ -3328,27 +3343,27 @@
                   ${isLegacyDaily(d) ? `
                   <div>
                     <span class="font-bold text-slate-500 block mb-1">어제 한 일 <span class="font-normal text-slate-400">(예전 형식)</span></span>
-                    <p class="text-slate-700 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.yesterday)}</p>
+                    <p class="text-slate-700 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg leading-relaxed">${richText(d.yesterday)}</p>
                   </div>
                   <div>
                     <span class="font-bold text-indigo-600 block mb-1">오늘 할 일 <span class="font-normal text-slate-400">(예전 형식)</span></span>
-                    <p class="text-slate-800 whitespace-pre-line bg-indigo-50/50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.today)}</p>
+                    <p class="text-slate-800 whitespace-pre-line bg-indigo-50/50 p-2.5 rounded-lg leading-relaxed">${richText(d.today)}</p>
                   </div>` : `
                   <div>
                     <span class="font-bold text-slate-600 block mb-1">오늘 한 일</span>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div class="bg-slate-50 p-2.5 rounded-lg"><span class="text-[10px] font-bold text-amber-600">오전</span><p class="text-slate-700 whitespace-pre-line leading-relaxed mt-0.5">${escapeHtml(d.morning || '-')}</p></div>
-                      <div class="bg-slate-50 p-2.5 rounded-lg"><span class="text-[10px] font-bold text-sky-600">오후</span><p class="text-slate-700 whitespace-pre-line leading-relaxed mt-0.5">${escapeHtml(d.afternoon || '-')}</p></div>
+                      <div class="bg-slate-50 p-2.5 rounded-lg"><span class="text-[10px] font-bold text-amber-600">오전</span><p class="text-slate-700 whitespace-pre-line leading-relaxed mt-0.5">${richText(d.morning || '-')}</p></div>
+                      <div class="bg-slate-50 p-2.5 rounded-lg"><span class="text-[10px] font-bold text-sky-600">오후</span><p class="text-slate-700 whitespace-pre-line leading-relaxed mt-0.5">${richText(d.afternoon || '-')}</p></div>
                     </div>
                   </div>
                   <div>
                     <span class="font-bold text-indigo-600 block mb-1">내일 할 일</span>
-                    <p class="text-slate-800 whitespace-pre-line bg-indigo-50/50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.tomorrow || '-')}</p>
+                    <p class="text-slate-800 whitespace-pre-line bg-indigo-50/50 p-2.5 rounded-lg leading-relaxed">${richText(d.tomorrow || '-')}</p>
                   </div>`}
                   ${d.blockers && d.blockers !== '없음' ? `
                     <div>
                       <span class="font-bold text-rose-600 block mb-1">블로커 / 특이사항</span>
-                      <p class="text-rose-700 whitespace-pre-line bg-rose-50 p-2.5 rounded-lg leading-relaxed">${escapeHtml(d.blockers)}</p>
+                      <p class="text-rose-700 whitespace-pre-line bg-rose-50 p-2.5 rounded-lg leading-relaxed">${richText(d.blockers)}</p>
                     </div>
                   ` : ''}
                 </div>
@@ -3694,7 +3709,7 @@
                 ${noticeMarks(n)}
                 <span class="ml-auto text-xs text-slate-400 shrink-0 whitespace-nowrap">${escapeHtml(getMember(n.authorId).name)} · ${n.date ? shortDateWithDay(n.date) : ''}</span>
               </div>
-              ${n.content ? `<p class="text-xs text-slate-500 mt-1.5 line-clamp-2 whitespace-pre-line">${escapeHtml(n.content)}</p>` : ''}
+              ${n.content ? `<p class="text-xs text-slate-500 mt-1.5 line-clamp-2 whitespace-pre-line">${richText(n.content)}</p>` : ''}
             </div>`).join('') : '<p class="p-10 text-center text-sm text-slate-400">등록된 글이 없습니다.</p>'}
         </div>`;
     }
@@ -3717,7 +3732,7 @@
                 <button type="button" onclick="deleteItem('notices', '${n.id}')" class="px-3 py-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50">삭제</button>` : readOnlyNote()}
             </div>
           </div>
-          <div class="text-sm text-slate-800 whitespace-pre-line leading-relaxed">${escapeHtml(n.content) || '<span class="text-slate-400">내용 없음</span>'}</div>
+          <div class="text-sm text-slate-800 whitespace-pre-line leading-relaxed">${richText(n.content) || '<span class="text-slate-400">내용 없음</span>'}</div>
         </div>
       `);
     }
@@ -3742,7 +3757,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">내용</label>
-            <textarea name="content" rows="7" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm leading-relaxed">${n ? escapeHtml(n.content) : ''}</textarea>
+            <textarea data-rich name="content" rows="7" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm leading-relaxed">${n ? escapeHtml(n.content) : ''}</textarea>
           </div>
           <label class="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
             <input type="checkbox" name="important" ${n && n.important ? 'checked' : ''} class="rounded text-rose-600" />
@@ -3786,12 +3801,89 @@
       document.getElementById('modal-hint').classList.add('hidden');
       document.getElementById('modal-title').textContent = title;
       document.getElementById('modal-body').innerHTML = bodyHtml;
+      enhanceRichInputs(document.getElementById('modal-body'));
       document.getElementById('modal-box').classList.replace('max-w-3xl', 'max-w-xl'); // 넓은 창을 쓴 뒤 원래 너비로
       const root = document.getElementById('modal-root');
       root.classList.remove('hidden');
       root.classList.add('flex');
       lucide.createIcons();
     }
+
+    // ---- 서식 버튼 (data-rich 가 붙은 입력 칸 위에 붙음)
+    function enhanceRichInputs(root) {
+      root.querySelectorAll('textarea[data-rich]').forEach(ta => {
+        if (ta.previousElementSibling && ta.previousElementSibling.hasAttribute('data-rich-bar')) return;
+        const bar = document.createElement('div');
+        bar.setAttribute('data-rich-bar', '');
+        bar.className = 'flex items-center gap-0.5 mb-1';
+        const b = (kind, label, title, cls) => `<button type="button" tabindex="-1" title="${title}" onmousedown="event.preventDefault()" onclick="applyRichFormat(this.parentElement.nextElementSibling, '${kind}')" class="h-6 min-w-[1.5rem] px-1.5 rounded border border-slate-200 bg-white hover:bg-slate-100 text-[11px] leading-none ${cls}">${label}</button>`;
+        bar.innerHTML = b('bold', 'B', '굵게 (Ctrl+B)', 'font-black text-slate-800')
+          + b('red', 'A', '빨강 강조', 'font-bold text-rose-600')
+          + b('mark', '<span class="bg-yellow-200 px-0.5 rounded-sm">형광</span>', '형광펜', 'text-slate-700')
+          + b('list', '• 목록', '줄 앞에 • 붙이기/빼기', 'text-slate-600');
+        ta.parentNode.insertBefore(bar, ta);
+      });
+    }
+    const RICH_MARK = { bold: '**', red: '!!', mark: '==' };
+    function replaceTextareaRange(ta, start, end, text) {
+      ta.focus();
+      ta.setSelectionRange(start, end);
+      let ok = false;
+      try { ok = document.execCommand('insertText', false, text); } catch (e) {}
+      if (!ok || ta.value.slice(start, start + text.length) !== text) {
+        ta.setRangeText(text, start, end, 'end');
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+    function applyRichFormat(ta, kind) {
+      if (!ta || ta.tagName !== 'TEXTAREA') return;
+      const v = ta.value;
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      if (kind === 'list') {
+        const ls = v.lastIndexOf('\n', s - 1) + 1;
+        let le = v.indexOf('\n', Math.max(e - (e > s && v[e - 1] === '\n' ? 1 : 0), s));
+        if (le < 0) le = v.length;
+        const lines = v.slice(ls, le).split('\n');
+        const allOn = lines.every(l => /^\s*[•\-]\s/.test(l) || !l.trim());
+        const out = lines.map(l => !l.trim() ? l : allOn ? l.replace(/^(\s*)[•\-]\s/, '$1') : (/^\s*[•\-]\s/.test(l) ? l : '• ' + l)).join('\n');
+        replaceTextareaRange(ta, ls, le, out);
+        ta.setSelectionRange(ls, ls + out.length);
+        return;
+      }
+      const mk = RICH_MARK[kind];
+      if (!mk) return;
+      // 이미 감싸져 있으면 풀기
+      if (s >= mk.length && v.slice(s - mk.length, s) === mk && v.slice(e, e + mk.length) === mk) {
+        const inner = v.slice(s, e);
+        replaceTextareaRange(ta, s - mk.length, e + mk.length, inner);
+        ta.setSelectionRange(s - mk.length, s - mk.length + inner.length);
+        return;
+      }
+      const sel = v.slice(s, e);
+      if (!sel) { // 선택이 없으면 기호만 넣고 그 사이에 커서
+        replaceTextareaRange(ta, s, e, mk + mk);
+        ta.setSelectionRange(s + mk.length, s + mk.length);
+        return;
+      }
+      // 여러 줄이면 줄마다 따로 감쌈 (앞의 • / 번호는 바깥에 둠)
+      const out = sel.split('\n').map(l => {
+        if (!l.trim()) return l;
+        const m = l.match(/^(\s*(?:[•\-]|\d+[.)])?\s*)(.*?)(\s*)$/);
+        return m[2] ? m[1] + mk + m[2] + mk + m[3] : l;
+      }).join('\n');
+      replaceTextareaRange(ta, s, e, out);
+      if (!sel.includes('\n')) {
+        const m = sel.match(/^(\s*(?:[•\-]|\d+[.)])?\s*)(.*?)(\s*)$/);
+        const a = s + m[1].length + mk.length;
+        ta.setSelectionRange(a, a + m[2].length);
+      } else ta.setSelectionRange(s, s + out.length);
+    }
+    document.addEventListener('keydown', e => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const ta = e.target;
+      if (!ta || ta.tagName !== 'TEXTAREA' || !ta.hasAttribute('data-rich')) return;
+      if (e.key === 'b' || e.key === 'B') { e.preventDefault(); applyRichFormat(ta, 'bold'); }
+    });
 
     function closeModal() {
       const root = document.getElementById('modal-root');
@@ -4147,15 +4239,15 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">금주 완료 및 진행 사항 *</label>
-            <textarea required name="completed" rows="10" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.completed) : '• '}</textarea>
+            <textarea data-rich required name="completed" rows="10" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.completed) : '• '}</textarea>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">차주 계획 *</label>
-            <textarea required name="nextPlan" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.nextPlan) : '• '}</textarea>
+            <textarea data-rich required name="nextPlan" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.nextPlan) : '• '}</textarea>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">이슈 및 지원 요청</label>
-            <textarea name="blockers" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.blockers) : '특이사항 없음'}</textarea>
+            <textarea data-rich name="blockers" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.blockers) : '특이사항 없음'}</textarea>
           </div>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
@@ -4224,21 +4316,21 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <span class="text-[11px] font-bold text-amber-600">오전</span>
-                <textarea name="morning" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item && !isLegacyDaily(item) ? escapeHtml(item.morning) : '• '}</textarea>
+                <textarea data-rich name="morning" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item && !isLegacyDaily(item) ? escapeHtml(item.morning) : '• '}</textarea>
               </div>
               <div>
                 <span class="text-[11px] font-bold text-sky-600">오후</span>
-                <textarea name="afternoon" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item && !isLegacyDaily(item) ? escapeHtml(item.afternoon) : '• '}</textarea>
+                <textarea data-rich name="afternoon" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item && !isLegacyDaily(item) ? escapeHtml(item.afternoon) : '• '}</textarea>
               </div>
             </div>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">내일 할 일 * <span class="font-normal text-slate-400">(금요일이면 다음 근무일)</span></label>
-            <textarea name="tomorrow" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item && !isLegacyDaily(item) ? escapeHtml(item.tomorrow) : '• '}</textarea>
+            <textarea data-rich name="tomorrow" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item && !isLegacyDaily(item) ? escapeHtml(item.tomorrow) : '• '}</textarea>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">블로커 / 특이사항</label>
-            <textarea name="blockers" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.blockers) : '없음'}</textarea>
+            <textarea data-rich name="blockers" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${item ? escapeHtml(item.blockers) : '없음'}</textarea>
           </div>
           <div class="flex justify-end gap-2 pt-2">
             <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">취소</button>
@@ -5527,9 +5619,9 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
             .sort((a, b) => a.start.localeCompare(b.start));
           return {
             m, mine,
-            done: mine.filter(r => r.completed.trim()).map(r => ({ week: weekNo(r.week), text: r.completed.trim() })),
-            issues: mine.filter(r => r.blockers.trim() && !NO_BLOCKER_RE.test(r.blockers)).map(r => ({ week: weekNo(r.week), text: r.blockers.trim() })),
-            next: mine.length ? mine[mine.length - 1].nextPlan.trim() : '',
+            done: mine.filter(r => r.completed.trim()).map(r => ({ week: weekNo(r.week), text: plainText(r.completed.trim()) })),
+            issues: mine.filter(r => r.blockers.trim() && !NO_BLOCKER_RE.test(r.blockers)).map(r => ({ week: weekNo(r.week), text: plainText(r.blockers.trim()) })),
+            next: mine.length ? plainText(mine[mine.length - 1].nextPlan.trim()) : '',
             projects, trips,
             solved: state.issues.filter(i => i.closedAt && i.closedAt >= from && i.closedAt <= to && i.assigneeIds.includes(m.id)),
             leave: leaveDaysIn(m.id, from, to),
@@ -5670,7 +5762,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
           .sort((a, b) => a.week.localeCompare(b.week) || state.members.findIndex(m => m.id === a.authorId) - state.members.findIndex(m => m.id === b.authorId))
           .forEach(r => {
             const p = getProject(r.projectId);
-            const row = raw.addRow([r.weekLabel, getMember(r.authorId).name, p ? p.title : '', r.completed, r.nextPlan, r.blockers]);
+            const row = raw.addRow([r.weekLabel, getMember(r.authorId).name, p ? p.title : '', plainText(r.completed), plainText(r.nextPlan), plainText(r.blockers)]);
             row.eachCell({ includeEmpty: true }, c => { c.border = border; c.alignment = wrap; });
           });
         [26, 10, 22, 60, 45, 40].forEach((w, i) => { raw.getColumn(i + 1).width = w; });
@@ -6789,12 +6881,12 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
             <h3 class="text-lg font-bold text-slate-900 mt-1">${escapeHtml(m.title)}</h3>
             <p class="text-xs text-slate-500 mt-1">참석: ${escapeHtml(m.attendeeIds.map(i => getMember(i).name).join(', ') || '-')}${m.externalAttendees ? ` · 외부: ${escapeHtml(m.externalAttendees)}` : ''}</p>
           </div>
-          ${section('안건', m.agenda ? `<p class="text-sm text-slate-700 whitespace-pre-line">${escapeHtml(m.agenda)}</p>` : '')}
-          ${section('회의 내용', m.notes ? `<p class="text-sm text-slate-700 whitespace-pre-line leading-relaxed">${escapeHtml(m.notes)}</p>` : '')}
+          ${section('안건', m.agenda ? `<p class="text-sm text-slate-700 whitespace-pre-line">${richText(m.agenda)}</p>` : '')}
+          ${section('회의 내용', m.notes ? `<p class="text-sm text-slate-700 whitespace-pre-line leading-relaxed">${richText(m.notes)}</p>` : '')}
           ${decisions.length ? `
           <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
             <div class="flex items-center justify-between mb-1.5"><p class="text-xs font-bold text-emerald-800">결정 사항 ${decisions.length}건</p><button type="button" onclick="meetingToNotice('${m.id}')" class="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900">공지로 올리기 →</button></div>
-            <ul class="list-disc pl-5 text-sm text-slate-800 space-y-0.5">${decisions.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+            <ul class="list-disc pl-5 text-sm text-slate-800 space-y-0.5">${decisions.map(d => `<li>${richText(d)}</li>`).join('')}</ul>
           </div>` : ''}
           ${m.actions.length ? `
           <div class="p-3 rounded-xl border border-slate-200">
@@ -6882,7 +6974,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
         m.notes ? `\n■ 회의 내용\n${m.notes}` : '',
         decisions.length ? `\n■ 결정 사항\n${decisions.map(d => '- ' + d).join('\n')}` : '',
         m.actions.length ? `\n■ 할 일\n${m.actions.map(a => `- [${a.done ? '완료' : ' '}] ${a.text} (${a.assigneeId ? getMember(a.assigneeId).name : '미지정'}${a.dueDate ? ', ~' + a.dueDate : ''})`).join('\n')}` : ''
-      ].filter(Boolean).join('\n');
+      ].filter(Boolean).map(plainText).join('\n');
     }
     function copyMeetingText(mid) {
       const m = state.meetings.find(x => x.id === mid);
@@ -6955,15 +7047,15 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">안건</label>
-            <textarea name="agenda" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(v.agenda)}</textarea>
+            <textarea data-rich name="agenda" rows="2" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(v.agenda)}</textarea>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">회의 내용</label>
-            <textarea name="notes" rows="5" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(v.notes)}</textarea>
+            <textarea data-rich name="notes" rows="5" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(v.notes)}</textarea>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">결정 사항 <span class="font-normal text-slate-400">(한 줄에 하나씩)</span></label>
-            <textarea name="decisions" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(v.decisions)}</textarea>
+            <textarea data-rich name="decisions" rows="3" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(v.decisions)}</textarea>
           </div>
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
             <div class="flex items-center justify-between"><p class="text-xs font-semibold text-slate-600">할 일</p><button type="button" onclick="addMeetingActionRow()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">+ 할 일 추가</button></div>
@@ -7063,8 +7155,8 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
             const status = r ? '제출' : onLeave(m, date) ? '휴가' : '미제출';
             const row = ws.addRow(r ? [
               m.name, m.role, status, dailyWorkplaceLabel(r), r.condition,
-              legacy ? `(예전 형식) 어제 한 일:\n${r.yesterday}` : r.morning, legacy ? '' : r.afternoon, legacy ? r.today : r.tomorrow,
-              NO_BLOCKER_RE.test(r.blockers || '') ? '없음' : r.blockers
+              ...[legacy ? `(예전 형식) 어제 한 일:\n${r.yesterday}` : r.morning, legacy ? '' : r.afternoon, legacy ? r.today : r.tomorrow,
+              NO_BLOCKER_RE.test(r.blockers || '') ? '없음' : r.blockers].map(plainText)
             ] : [m.name, m.role, status, '', '', '', '', '', '']);
             row.eachCell({ includeEmpty: true }, (c, i) => {
               c.border = border;
@@ -7368,7 +7460,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
         const author = getMember(r.authorId);
         return `### [${r.weekLabel}] ${author.name}\n- 금주 완료/진행:\n${r.completed}\n- 차주 계획:\n${r.nextPlan}\n- 이슈/요청: ${r.blockers || '없음'}`;
       }).join('\n\n');
-      copyTextToClipboard(md || '등록된 주간보고가 없습니다.', '주간보고 요약이 클립보드에 복사되었습니다.');
+      copyTextToClipboard(plainText(md) || '등록된 주간보고가 없습니다.', '주간보고 요약이 클립보드에 복사되었습니다.');
     }
 
     function copyDailyMarkdown() {
@@ -7378,7 +7470,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
         if (isLegacyDaily(d)) return `### [${d.date}] ${author.name} (${d.condition})\n- 어제: ${d.yesterday.replace(/\n/g, ' ')}\n- 오늘: ${d.today.replace(/\n/g, ' ')}\n- 블로커: ${d.blockers}`;
         return `### [${d.date}] ${author.name} (${d.condition}${d.workplace ? ' · ' + dailyWorkplaceLabel(d) : ''})\n- 오전: ${(d.morning || '-').replace(/\n/g, ' ')}\n- 오후: ${(d.afternoon || '-').replace(/\n/g, ' ')}\n- 내일: ${(d.tomorrow || '-').replace(/\n/g, ' ')}\n- 블로커: ${d.blockers}`;
       }).join('\n\n');
-      copyTextToClipboard(md || '등록된 일간보고가 없습니다.', '일간보고 요약이 클립보드에 복사되었습니다.');
+      copyTextToClipboard(plainText(md) || '등록된 일간보고가 없습니다.', '일간보고 요약이 클립보드에 복사되었습니다.');
     }
 
     // =========================================================================
