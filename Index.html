@@ -185,7 +185,10 @@
   <div id="modal-root" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/50 backdrop-blur-[1px]">
     <div id="modal-box" class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
       <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-        <h3 id="modal-title" class="text-base font-bold text-slate-900">제목</h3>
+        <div class="min-w-0 flex items-baseline gap-2 flex-wrap">
+          <h3 id="modal-title" class="text-base font-bold text-slate-900">제목</h3>
+          <span id="modal-hint" class="hidden text-[11px] font-semibold text-amber-600">작성 중이에요 · 닫으려면 X 또는 취소</span>
+        </div>
         <button type="button" onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition" aria-label="모달 닫기">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
@@ -2211,7 +2214,7 @@
     // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
     // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
     // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
-    const APP_VERSION = '20261127-140820';
+    const APP_VERSION = '20261127-160016';
     let updateNoticeShown = false;
     async function checkForUpdate() {
       if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
@@ -3730,8 +3733,12 @@
     // =========================================================================
     let pendingConfirm = null;
 
+    let modalDirty = false; // 창 안에서 무언가 입력했는지 (바깥 클릭으로 닫히지 않게)
+
     function openModal(title, bodyHtml) {
       pendingConfirm = null;
+      modalDirty = false;
+      document.getElementById('modal-hint').classList.add('hidden');
       document.getElementById('modal-title').textContent = title;
       document.getElementById('modal-body').innerHTML = bodyHtml;
       document.getElementById('modal-box').classList.replace('max-w-3xl', 'max-w-xl'); // 넓은 창을 쓴 뒤 원래 너비로
@@ -3746,6 +3753,7 @@
       root.classList.add('hidden');
       root.classList.remove('flex');
       pendingConfirm = null;
+      modalDirty = false;
     }
 
     // 브라우저 confirm() 대신 사용 (Google Sites 삽입 화면에서는 confirm 창이 막힐 수 있음)
@@ -7418,8 +7426,25 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
     }
 
     // Close modal on backdrop click
+    // - 글 선택 중 마우스를 바깥에서 떼는 경우는 닫지 않음 (누른 곳과 뗀 곳이 모두 바깥일 때만)
+    // - 입력한 내용이 있으면 바깥 클릭으로 닫지 않음 (X 또는 취소로만 닫힘)
+    let modalPressOnBackdrop = false;
+    document.getElementById('modal-root').addEventListener('mousedown', function(e) {
+      modalPressOnBackdrop = e.target === this;
+    });
+    document.getElementById('modal-body').addEventListener('input', () => { modalDirty = true; });
+    document.getElementById('modal-body').addEventListener('change', () => { modalDirty = true; });
     document.getElementById('modal-root').addEventListener('click', function(e) {
-      if (e.target === this) closeModal();
+      const pressed = modalPressOnBackdrop;
+      modalPressOnBackdrop = false;
+      if (e.target !== this || !pressed) return;
+      if (modalDirty) {
+        const box = document.getElementById('modal-box');
+        if (box.animate) box.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }], { duration: 220 });
+        document.getElementById('modal-hint').classList.remove('hidden');
+        return;
+      }
+      closeModal();
     });
 
     // Boot
