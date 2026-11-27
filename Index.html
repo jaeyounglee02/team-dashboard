@@ -915,7 +915,8 @@
         workEmail: /^[^\s@<>"']+@[^\s@<>"']+$/.test(str(m.workEmail).trim()) ? str(m.workEmail).trim().toLowerCase() : '',
         tripPlace: str(m.tripPlace), tripStart: dateOr(m.tripStart), tripReturn: dateOr(m.tripReturn),
         awayScheduleId: idOr(m.awayScheduleId), tripReturnTime: TIME_RE.test(str(m.tripReturnTime)) ? str(m.tripReturnTime) : '',
-        reportExempt: m.reportExempt === true, tripExempt: m.tripExempt === true, visa: str(m.visa).trim().slice(0, 20)
+        reportExempt: m.reportExempt === true || m.executive === true, tripExempt: m.tripExempt === true || m.executive === true,
+        executive: m.executive === true, visa: str(m.visa).trim().slice(0, 20)
       }),
       projects: p => ({
         id: p.id, title: str(p.title), category: str(p.category), status: str(p.status), priority: str(p.priority),
@@ -1761,6 +1762,12 @@
 
     // 작성자 칸: 관리자는 선택, 일반 팀원은 본인으로 고정
     // reportsOnly: 일간·주간보고 작성자 목록에서는 '보고 제외' 팀원을 뺌 (이미 그 사람이 쓴 보고를 고칠 때만 남김)
+    // 실무 팀원: '최상위 관리자'(프로젝트·출장·보고·상태와 무관한 임원)를 뺀 목록
+    // keep: 이미 그 사람이 지정된 항목을 고칠 때는 목록에 남김
+    function workMembers(keep = []) {
+      const k = Array.isArray(keep) ? keep : [keep];
+      return state.members.filter(m => !m.executive || k.includes(m.id));
+    }
     function reportAuthorOptions(keepId) {
       return state.members.filter(m => !m.reportExempt || m.id === keepId);
     }
@@ -2156,7 +2163,7 @@
     // ---- 새 버전 알림: GitHub에 올린 화면이 바뀌면 '새로고침' 안내를 띄움
     // (GitHub Pages는 브라우저가 화면 파일을 10분까지 다시 쓰므로, 주소에 ?v= 를 붙여 새로 받게 함)
     // APP_VERSION 은 GitHub에 올릴 때 올린 시각으로 바뀜. 'dev' 면 검사하지 않음
-    const APP_VERSION = '20261127-091246';
+    const APP_VERSION = '20261127-134123';
     let updateNoticeShown = false;
     async function checkForUpdate() {
       if (APP_VERSION === 'dev' || updateNoticeShown || !/^https?:$/.test(location.protocol)) return;
@@ -2536,7 +2543,7 @@
 
     function renderOverview() {
       const ov = computeOverview();
-      const away = state.members.filter(isAway);
+      const away = workMembers().filter(isAway);
       const todaySchedules = state.schedules
         .filter(s => scheduleOn(s, TODAY) && s.auto !== 'absence') // 부재는 출장·외근/팀원 상태 카드에서 보여 줌
         .sort((a, b) => a.time.localeCompare(b.time));
@@ -2617,7 +2624,7 @@
           </div>`;
       }).join('') : '<p class="text-xs text-slate-400 py-4 text-center">출장·외근 중인 인원 없음</p>';
 
-      const statusRows = MEMBER_STATUSES.map(st => ({ st, list: state.members.filter(m => statusToday(m) === st) }));
+      const statusRows = MEMBER_STATUSES.map(st => ({ st, list: workMembers().filter(m => statusToday(m) === st) }));
       const statusHtml = statusRows.filter(r => r.list.length).map(r => `
           <div class="flex items-start gap-2"><span class="px-2 py-0.5 rounded-full ${STATUS_STYLE[r.st]} font-semibold w-20 text-center shrink-0 whitespace-nowrap">${statusShort(r.st)} ${r.list.length}</span><span class="text-slate-700">${r.list.map(m => escapeHtml(m.name)).join(', ')}</span></div>
         `).join('') + (() => {
@@ -2744,8 +2751,8 @@
             </div>
           </div>
           <div class="${card}">
-            <div class="flex items-center gap-2 mb-3"><i data-lucide="users" class="w-4 h-4 text-sky-600"></i><h3 class="text-sm font-bold text-slate-900">오늘 팀원 상태</h3>${linkBtn('members', `${state.members.length}명`)}</div>
-            <div class="space-y-2 text-xs">${state.members.length ? statusHtml : '<p class="text-slate-400">등록된 팀원 없음</p>'}</div>
+            <div class="flex items-center gap-2 mb-3"><i data-lucide="users" class="w-4 h-4 text-sky-600"></i><h3 class="text-sm font-bold text-slate-900">오늘 팀원 상태</h3>${linkBtn('members', `${workMembers().length}명`)}</div>
+            <div class="space-y-2 text-xs">${workMembers().length ? statusHtml : '<p class="text-slate-400">등록된 팀원 없음</p>'}</div>
           </div>
         </section>
 
@@ -2954,14 +2961,14 @@
       const currentFilter = state.memberFilterStatus || '전체';
       const filteredMembers = currentFilter === '전체'
         ? state.members
-        : state.members.filter(m => m.status === currentFilter);
+        : workMembers().filter(m => m.status === currentFilter);
 
       return `
         ${renderJoinRequestsPanel()}
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 class="text-sm font-bold text-slate-900">팀 인원 및 리소스 현황 (${state.members.length}명)</h3>
+              <h3 class="text-sm font-bold text-slate-900">팀 인원 및 리소스 현황 (${workMembers().length}명)</h3>
               <p class="text-xs text-slate-500">${canManageMembers() ? '팀원 카드를 눌러 정보·상태·Google 계정을 수정할 수 있습니다.' : '팀원 이름, 역할, 상태(출장·외근 포함)를 확인할 수 있습니다.'}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
@@ -2975,7 +2982,7 @@
           </div>
           <div class="flex flex-wrap gap-1.5">
             ${statuses.map(st => {
-              const cnt = st === '전체' ? state.members.length : state.members.filter(m => m.status === st).length;
+              const cnt = st === '전체' ? state.members.length : workMembers().filter(m => m.status === st).length;
               const active = currentFilter === st;
               return `
                 <button type="button" onclick="setMemberStatusFilter('${st}')"
@@ -3002,9 +3009,9 @@
                       <p class="text-xs text-slate-500 truncate">${escapeHtml(m.role)} · ${escapeHtml(m.part)}</p>
                     </div>
                   </div>
-                  ${renderMemberStatusBadge(m.status)}
+                  ${m.executive ? '<span class="shrink-0 px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] font-bold">최상위 관리자</span>' : renderMemberStatusBadge(m.status)}
                 </div>
-                ${ABSENCE_STATUSES.includes(m.status) && (m.tripPlace || m.tripReturn || m.tripStart) ? `
+                ${!m.executive && ABSENCE_STATUSES.includes(m.status) && (m.tripPlace || m.tripReturn || m.tripStart) ? `
                   <div class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg ${m.status === '외근' ? 'bg-teal-50 text-teal-800' : m.status === '휴가' ? 'bg-amber-50 text-amber-800' : 'bg-purple-50 text-purple-800'}">
                     <i data-lucide="${m.status === '휴가' ? 'palmtree' : 'map-pin'}" class="w-3.5 h-3.5 shrink-0"></i>
                     <span class="truncate">${m.tripStart && m.tripStart > TODAY ? `<b>${shortDateWithDay(m.tripStart)}부터</b> · ` : ''}${escapeHtml(m.tripPlace || (m.status === '휴가' ? '휴가' : '행선지 미입력'))}</span>
@@ -3806,7 +3813,7 @@
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1.5">담당 팀원</label>
             <div class="flex flex-wrap gap-2">
-              ${state.members.map(m => {
+              ${workMembers(item ? item.assigneeIds || [] : []).map(m => {
                 const checked = item && (item.assigneeIds || []).includes(m.id);
                 return `
                   <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-xs cursor-pointer hover:bg-slate-50">
@@ -3907,6 +3914,10 @@
             </div>
           </div>
           ${renderStatusFields(item)}
+          <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
+            <input type="checkbox" name="executive" ${item && item.executive ? 'checked' : ''} class="rounded text-indigo-600 mt-0.5" onchange="if (this.checked) { this.form.reportExempt.checked = true; this.form.tripExempt.checked = true; }" />
+            <span>최상위 관리자 (임원) <span class="block text-[11px] text-slate-400">프로젝트·이슈 담당, 출장, 일간·주간보고, 팀원 상태·연차 현황에서 빠집니다. 대화·공지·회의 참석은 그대로.</span></span>
+          </label>
           <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input type="checkbox" name="reportExempt" ${item && item.reportExempt ? 'checked' : ''} class="rounded text-indigo-600" />
             일간·주간보고 대상에서 제외 <span class="text-[11px] text-slate-400">(미작성·미제출 집계에 넣지 않음)</span>
@@ -3953,8 +3964,9 @@
         color: fd.get('color') || 'bg-indigo-600',
         email: (fd.get('email') || '').trim().toLowerCase(),
         workEmail: (fd.get('workEmail') || '').trim().toLowerCase(),
-        reportExempt: fd.get('reportExempt') === 'on',
-        tripExempt: fd.get('tripExempt') === 'on',
+        executive: fd.get('executive') === 'on',
+        reportExempt: fd.get('reportExempt') === 'on' || fd.get('executive') === 'on',
+        tripExempt: fd.get('tripExempt') === 'on' || fd.get('executive') === 'on',
         visa: (fd.get('visa') || '').trim().slice(0, 20)
       };
       if (data.email && state.members.some(m => m.id !== data.id && (m.email === data.email || m.workEmail === data.email))) {
@@ -5002,7 +5014,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">인원 *</label>
               <select name="memberId" onchange="document.getElementById('trip-person-wrap').classList.toggle('hidden', this.value !== '__other')" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                ${state.members.map(m => `<option value="${m.id}" ${v.memberId === m.id ? 'selected' : ''}>${escapeHtml(m.name)} ${escapeHtml(m.role)}</option>`).join('')}
+                ${workMembers([v.memberId]).map(m => `<option value="${m.id}" ${v.memberId === m.id ? 'selected' : ''}>${escapeHtml(m.name)} ${escapeHtml(m.role)}</option>`).join('')}
                 <option value="__other" ${other ? 'selected' : ''}>기타 (직접 입력)</option>
               </select>
               <div id="trip-person-wrap" class="${other ? '' : 'hidden'} mt-2">
@@ -5320,7 +5332,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
 
     function openLeaveModal(year) {
       year = Number(year) || parseYmd(TODAY).getFullYear();
-      const rows = state.members.map(m => {
+      const rows = workMembers().map(m => {
         const months = MONTHS.map(mo => leaveDaysIn(m.id, ...monthRange(`${year}-${pad2(mo)}`)));
         return { m, months, total: months.reduce((a, b) => a + b, 0) };
       });
@@ -5806,7 +5818,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
               ${view === 'kanban' ? '' : sel('status', [{ v: '열린 이슈', l: '열린 이슈' }, ...ISSUE_STATUSES.map(s => ({ v: s, l: s }))], '상태: 전체')}
               ${sel('site', [{ v: '사내', l: '사내' }, ...sites.map(s => ({ v: s.id, l: s.name }))], '사이트: 전체')}
               ${sel('severity', ISSUE_SEVERITIES.map(s => ({ v: s, l: s })), '심각도: 전체')}
-              ${sel('member', state.members.map(m => ({ v: m.id, l: m.name })), '담당자: 전체')}
+              ${sel('member', workMembers().map(m => ({ v: m.id, l: m.name })), '담당자: 전체')}
             </div>
             <div class="flex flex-wrap items-center gap-1.5">
               ${chip('mine', '내 이슈', state.issues.filter(i => issueOpen(i) && (i.assigneeIds.includes(myMemberId()) || i.authorId === myMemberId())).length, 'bg-indigo-600 text-white')}
@@ -6067,7 +6079,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1.5">담당자</label>
             <div class="flex flex-wrap gap-1.5">
-              ${state.members.map(m => `
+              ${workMembers(v.assigneeIds).map(m => `
                 <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-xs cursor-pointer hover:bg-slate-50">
                   <input type="checkbox" name="assigneeIds" value="${m.id}" ${v.assigneeIds.includes(m.id) ? 'checked' : ''} class="rounded text-indigo-600" /><span>${escapeHtml(m.name)}</span>
                 </label>`).join('')}
@@ -6363,7 +6375,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
               </select>
               <select name="holderId" class="col-span-2 sm:col-span-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5">
                 <option value="">사용자 없음</option>
-                ${state.members.map(m => `<option value="${m.id}" ${p.holderId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+                ${workMembers([p.holderId]).map(m => `<option value="${m.id}" ${p.holderId === m.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
               </select>
               <div id="part-out-box" class="${p.status === '현장 반출' ? '' : 'hidden'} col-span-2 grid grid-cols-2 gap-2">
                 <select name="siteId" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5">
@@ -6768,7 +6780,7 @@ h1,h2,h3{line-height:1.35}p{margin:6px 0}.doc-title{font-size:1.9em;border-botto
           <input value="${escapeHtml(a.text)}" oninput="meetingActionsDraft[${i}].text = this.value" placeholder="할 일" class="col-span-12 sm:col-span-6 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white" />
           <select onchange="meetingActionsDraft[${i}].assigneeId = this.value" class="col-span-5 sm:col-span-3 border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white">
             <option value="">담당 미지정</option>
-            ${state.members.map(mm => `<option value="${mm.id}" ${a.assigneeId === mm.id ? 'selected' : ''}>${escapeHtml(mm.name)}</option>`).join('')}
+            ${workMembers([a.assigneeId]).map(mm => `<option value="${mm.id}" ${a.assigneeId === mm.id ? 'selected' : ''}>${escapeHtml(mm.name)}</option>`).join('')}
           </select>
           <input type="date" value="${escapeHtml(a.dueDate || '')}" onchange="meetingActionsDraft[${i}].dueDate = this.value" class="col-span-5 sm:col-span-2 border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white" />
           <button type="button" onclick="meetingActionsDraft.splice(${i}, 1); refreshMeetingActionRows()" class="col-span-2 sm:col-span-1 p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 justify-self-center" title="빼기"><i data-lucide="x" class="w-4 h-4"></i></button>
